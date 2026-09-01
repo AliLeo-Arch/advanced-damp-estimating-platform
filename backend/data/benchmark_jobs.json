@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "title": "Advanced Damp historical job validation templates",
+    "note": "Add real Advanced Damp jobs here once live rates are loaded. Expected sell values are checked within tolerance_gbp (default £1.00 on seed scenarios, use £50–£200 for real jobs)."
+  },
+  "scenarios": [
+    {
+      "id": "HIST-TEMPLATE-01",
+      "title": "Template — replace with real issued quotation reference",
+      "reference": "AD-XXXXX",
+      "issued_sell_ex_vat": null,
+      "notes": "Copy measurements from survey; set expect.sell_price to the agreed historical sell once validated.",
+      "travel_band": "TRV-LOCAL",
+      "waste": "WS-ALLOW-SMALL",
+      "preliminaries": ["PRE-STD"],
+      "work_items": [
+        {
+          "work_type": "dpc_replastering",
+          "walls": 1,
+          "wall_length_lm": 8.0,
+          "replaster_height_m": 1.0
+        }
+      ],
+      "expect": {
+        "min_sell": 750.0,
+        "min_margin_percent": 20.0
+      }
+    }
+  ]
+}

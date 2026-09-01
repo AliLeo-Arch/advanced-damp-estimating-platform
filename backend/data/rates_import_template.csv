@@ -1,0 +1,6 @@
+code,name,category,unit,cost_per_unit,waste_percent,notes,active
+MAT-DPC-CREAM,Chemical DPC cream tube,materials,tube,12.50,5,Example row — replace with live supplier cost,true
+LAB-DPC-LM,DPC injection labour,labour,lm,18.00,0,Per linear metre,true
+TRV-LOCAL,Local travel band,travel,band,0.00,0,Within 15 miles,true
+WS-ALLOW-SMALL,Small waste allowance,waste_skip,job,85.00,0,Skip/waste allowance,true
+PRE-STD,Standard preliminaries,preliminaries,job,120.00,0,Setup and protection,true

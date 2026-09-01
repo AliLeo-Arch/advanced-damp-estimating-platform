@@ -1,0 +1,49 @@
+---
+description: Advanced Damp estimating UI/UX brand and interaction rules
+globs: frontend/**/*.{tsx,ts,css,html}
+alwaysApply: false
+---
+
+# Advanced Damp UI/UX Rules
+
+Brand source: https://advanceddamp.co.uk/
+
+## Identity
+
+- Logo wordmark + subtitle "Estimating" in the app chrome.
+- Colours: navy `#0C1644`, orange CTA `#FF5F14`, blue accent `#2C93F5`, canvas `#F5F7FA`, ink `#0C0D0E`, muted `#706F6F`, line `#E0E0E0`.
+- Success `#2F532E` / danger `#870000` for margin health only.
+- Fonts: **Red Hat Display** (titles/CTAs), **Montserrat** (UI/body). Tabular nums for money.
+- Do not use teal/cream POC palette, Inter-as-brand, purple gradients, glow, or emoji status.
+
+## Product vs website
+
+- Borrow brand tokens and tone; do not recreate marketing heroes, review carousels, or service card grids in the app.
+- Voice: clear, diagnostic, plain English, no hype.
+
+## UX principles
+
+1. Survey-first flow: Customer/site → Scope → Measurements → Price review → Quotation.
+2. Field-speed: large targets, sticky primary actions on small screens, minimal typing.
+3. Always show cost, sell, margin £/% before PDF; live recalculation on override.
+4. Never put cost/margin on customer-facing quotation/PDF.
+5. One primary orange CTA per region; secondary actions outline/quiet.
+6. Radius ~5px; prefer 1px borders over heavy shadows.
+7. Work-type labels follow company language (DPC/replastering, cavity drain, sump & pump, timber, condensation & ventilation).
+
+## Mobile (phone ≤640px)
+
+Follow `docs/MOBILE_UI_UX_PRINCIPLES.md`:
+- Header = logo + hamburger only; drawer for nav / New estimate / Sign out.
+- Single-column forms; no horizontal page scroll.
+- Inputs ≥16px; tap targets ≥44px.
+- Workflow chips scroll in their own row.
+- Sticky step actions on long measurement/pricing steps.
+- Same brand tokens — denser layout, not a separate theme.
+
+## Implementation
+
+- Prefer CSS variables from the design system (`--ad-*`).
+- Format money with `en-GB` / GBP.
+- Mark internal pricing surfaces explicitly vs quotation preview.
+- Full rules: `docs/UI_UX_DESIGN_SYSTEM.md` + `docs/MOBILE_UI_UX_PRINCIPLES.md`

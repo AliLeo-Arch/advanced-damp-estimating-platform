@@ -1,0 +1,711 @@
+{
+  "meta": {
+    "title": "Advanced Damp Ltd — POC Sample Commercial Data",
+    "currency": "GBP",
+    "vat_rate": 0.20,
+    "office_base": {
+      "name": "Advanced Damp Ltd — Head Office",
+      "address": "Unit 4, Riverside Industrial Estate, Croydon",
+      "postcode": "CR0 4XB",
+      "phone": "020 7946 0182",
+      "email": "estimates@advanceddamp.example",
+      "website": "www.advanceddamp.example"
+    },
+    "disclaimer": "Illustrative POC rates for testing only. Replace with Advanced Damp's live supplier costs, labour productivity and commercial targets during discovery. Not for live customer quotations."
+  },
+  "pricing_rules": {
+    "minimum_job_value": 750.0,
+    "quote_validity_days": 30,
+    "default_payment_terms": "50% deposit on acceptance; balance due on completion.",
+    "margins_by_work_type": [
+      {
+        "work_type": "dpc_replastering",
+        "label": "Chemical DPC Injection & Replastering",
+        "target_margin_percent": 35.0
+      },
+      {
+        "work_type": "cavity_drain",
+        "label": "Cavity Drain Membrane Systems",
+        "target_margin_percent": 32.0
+      },
+      {
+        "work_type": "sump_pump",
+        "label": "Sump & Pump Installations",
+        "target_margin_percent": 30.0
+      },
+      {
+        "work_type": "timber_treatment",
+        "label": "Timber Treatment",
+        "target_margin_percent": 33.0
+      },
+      {
+        "work_type": "ventilation",
+        "label": "Condensation & Ventilation",
+        "target_margin_percent": 28.0
+      }
+    ]
+  },
+  "labour_rates": [
+    {
+      "code": "LAB-DAY-TECH",
+      "name": "Damp technician — day rate",
+      "unit": "day",
+      "cost_per_unit": 280.0,
+      "notes": "Fully inclusive site operative day rate (ex. materials)."
+    },
+    {
+      "code": "LAB-DAY-LEAD",
+      "name": "Lead surveyor / senior tech — day rate",
+      "unit": "day",
+      "cost_per_unit": 340.0,
+      "notes": "Used for complex basement / multi-trade packages."
+    },
+    {
+      "code": "LAB-DPC-LM",
+      "name": "DPC injection labour",
+      "unit": "lm",
+      "cost_per_unit": 18.0,
+      "notes": "Output rate per linear metre of wall treated."
+    },
+    {
+      "code": "LAB-REPLASTER-M2",
+      "name": "Replastering labour",
+      "unit": "m2",
+      "cost_per_unit": 42.0,
+      "notes": "Includes preparation, render/plaster and clean-down."
+    },
+    {
+      "code": "LAB-MEMBRANE-M2",
+      "name": "Cavity drain membrane labour",
+      "unit": "m2",
+      "cost_per_unit": 28.0,
+      "notes": "Wall or floor membrane fixing labour."
+    },
+    {
+      "code": "LAB-BOARD-M2",
+      "name": "Boarding / dry-lining labour",
+      "unit": "m2",
+      "cost_per_unit": 22.0,
+      "notes": "Battens and boarding over membrane."
+    },
+    {
+      "code": "LAB-TIMBER-M2",
+      "name": "Timber treatment labour",
+      "unit": "m2",
+      "cost_per_unit": 16.0,
+      "notes": "Spray / brush application to accessible timber."
+    },
+    {
+      "code": "LAB-JOIST-EA",
+      "name": "Joist repair / sistering labour",
+      "unit": "each",
+      "cost_per_unit": 65.0,
+      "notes": "Per joist repair allowance."
+    },
+    {
+      "code": "LAB-VENT-INSTALL",
+      "name": "Ventilation unit installation labour",
+      "unit": "each",
+      "cost_per_unit": 95.0,
+      "notes": "Per extractor or PIV unit installed."
+    },
+    {
+      "code": "LAB-SUMP-INSTALL",
+      "name": "Sump package installation labour",
+      "unit": "package",
+      "cost_per_unit": 520.0,
+      "notes": "Base labour allowance for standard sump install."
+    }
+  ],
+  "materials": [
+    {
+      "code": "MAT-DPC-CREAM",
+      "name": "DPC injection cream (BBA-type)",
+      "category": "dpc_replastering",
+      "unit": "litre",
+      "cost_per_unit": 28.50,
+      "waste_percent": 8.0,
+      "consumption_note": "Approx. 0.3 L per lm for 225 mm solid wall (POC assumption).",
+      "supplier_ref": "SAMPLE-DPC-01",
+      "active": true
+    },
+    {
+      "code": "MAT-DPC-PLUGS",
+      "name": "Injection hole plugs",
+      "category": "dpc_replastering",
+      "unit": "each",
+      "cost_per_unit": 0.35,
+      "waste_percent": 5.0,
+      "consumption_note": "Approx. 6 plugs per lm.",
+      "supplier_ref": "SAMPLE-PLG-01",
+      "active": true
+    },
+    {
+      "code": "MAT-RENOV-PLASTER",
+      "name": "Renovating plaster",
+      "category": "dpc_replastering",
+      "unit": "bag_25kg",
+      "cost_per_unit": 18.75,
+      "waste_percent": 10.0,
+      "consumption_note": "Approx. 1 bag per 2.5 m² at 12 mm.",
+      "supplier_ref": "SAMPLE-RP-25",
+      "active": true
+    },
+    {
+      "code": "MAT-SBR-PRIMER",
+      "name": "SBR bonding primer",
+      "category": "dpc_replastering",
+      "unit": "litre",
+      "cost_per_unit": 6.40,
+      "waste_percent": 5.0,
+      "consumption_note": "Approx. 0.2 L per m².",
+      "supplier_ref": "SAMPLE-SBR-01",
+      "active": true
+    },
+    {
+      "code": "MAT-CDM-WALL-8",
+      "name": "Cavity drain membrane — wall 8 mm",
+      "category": "cavity_drain",
+      "unit": "m2",
+      "cost_per_unit": 14.80,
+      "waste_percent": 10.0,
+      "consumption_note": "Allow 10% for overlaps and detailing.",
+      "supplier_ref": "SAMPLE-CDM-W8",
+      "active": true
+    },
+    {
+      "code": "MAT-CDM-FLOOR-20",
+      "name": "Cavity drain membrane — floor 20 mm",
+      "category": "cavity_drain",
+      "unit": "m2",
+      "cost_per_unit": 18.20,
+      "waste_percent": 10.0,
+      "consumption_note": "Allow 10% for overlaps.",
+      "supplier_ref": "SAMPLE-CDM-F20",
+      "active": true
+    },
+    {
+      "code": "MAT-CDM-FIXINGS",
+      "name": "Membrane brick plugs / seals",
+      "category": "cavity_drain",
+      "unit": "each",
+      "cost_per_unit": 0.55,
+      "waste_percent": 5.0,
+      "consumption_note": "Approx. 11 fixings per m² wall membrane.",
+      "supplier_ref": "SAMPLE-FIX-11",
+      "active": true
+    },
+    {
+      "code": "MAT-BATTEN-25",
+      "name": "Treated softwood batten 25×38 mm",
+      "category": "cavity_drain",
+      "unit": "lm",
+      "cost_per_unit": 1.85,
+      "waste_percent": 8.0,
+      "consumption_note": "Approx. 2.5 lm battens per m² boarded wall.",
+      "supplier_ref": "SAMPLE-BAT-25",
+      "active": true
+    },
+    {
+      "code": "MAT-BOARD-12.5",
+      "name": "Moisture-resistant plasterboard 12.5 mm",
+      "category": "cavity_drain",
+      "unit": "m2",
+      "cost_per_unit": 8.90,
+      "waste_percent": 10.0,
+      "consumption_note": "Board area ≈ wall membrane area.",
+      "supplier_ref": "SAMPLE-PB-MR",
+      "active": true
+    },
+    {
+      "code": "MAT-DRAIN-CHANNEL",
+      "name": "Perimeter drainage channel",
+      "category": "cavity_drain",
+      "unit": "lm",
+      "cost_per_unit": 22.50,
+      "waste_percent": 5.0,
+      "consumption_note": "Where floor/wall junction drainage is specified.",
+      "supplier_ref": "SAMPLE-CH-01",
+      "active": true
+    },
+    {
+      "code": "MAT-TIMBER-FLUID",
+      "name": "Timber preservative / fungicide",
+      "category": "timber_treatment",
+      "unit": "litre",
+      "cost_per_unit": 9.80,
+      "waste_percent": 8.0,
+      "consumption_note": "Approx. 0.25 L per m² treated surface.",
+      "supplier_ref": "SAMPLE-TF-01",
+      "active": true
+    },
+    {
+      "code": "MAT-JOIST-C24",
+      "name": "Replacement joist timber C24",
+      "category": "timber_treatment",
+      "unit": "lm",
+      "cost_per_unit": 12.40,
+      "waste_percent": 5.0,
+      "consumption_note": "Per linear metre of replacement joist.",
+      "supplier_ref": "SAMPLE-C24",
+      "active": true
+    },
+    {
+      "code": "MAT-FLOORBOARD",
+      "name": "Softwood floorboarding",
+      "category": "timber_treatment",
+      "unit": "m2",
+      "cost_per_unit": 24.00,
+      "waste_percent": 10.0,
+      "consumption_note": "Where floor boards are renewed.",
+      "supplier_ref": "SAMPLE-FB-01",
+      "active": true
+    },
+    {
+      "code": "MAT-EXTRACTOR-100",
+      "name": "Extractor fan 100 mm (bathroom)",
+      "category": "ventilation",
+      "unit": "each",
+      "cost_per_unit": 68.00,
+      "waste_percent": 0.0,
+      "consumption_note": "Supply only; labour separate.",
+      "supplier_ref": "SAMPLE-XF-100",
+      "active": true
+    },
+    {
+      "code": "MAT-PIV-UNIT",
+      "name": "Positive Input Ventilation (PIV) unit",
+      "category": "ventilation",
+      "unit": "each",
+      "cost_per_unit": 420.00,
+      "waste_percent": 0.0,
+      "consumption_note": "Loft-mounted PIV supply package.",
+      "supplier_ref": "SAMPLE-PIV-01",
+      "active": true
+    },
+    {
+      "code": "MAT-VENT-DUCT",
+      "name": "Flexible ducting & grille pack",
+      "category": "ventilation",
+      "unit": "each",
+      "cost_per_unit": 28.00,
+      "waste_percent": 0.0,
+      "consumption_note": "Per ventilation install.",
+      "supplier_ref": "SAMPLE-VD-01",
+      "active": true
+    }
+  ],
+  "sump_packages": [
+    {
+      "code": "PKG-SUMP-STD",
+      "name": "Standard sump & single pump package",
+      "material_package_cost": 980.0,
+      "labour_code": "LAB-SUMP-INSTALL",
+      "includes": [
+        "Sump chamber",
+        "Single submersible pump",
+        "Non-return valve",
+        "Discharge pipework allowance",
+        "Basic high-water alarm"
+      ],
+      "active": true
+    },
+    {
+      "code": "PKG-SUMP-TWIN",
+      "name": "Twin pump sump package",
+      "material_package_cost": 1480.0,
+      "labour_code": "LAB-SUMP-INSTALL",
+      "includes": [
+        "Sump chamber",
+        "Twin pumps (duty/standby)",
+        "Non-return valves",
+        "Discharge pipework allowance",
+        "High-water alarm"
+      ],
+      "active": true
+    },
+    {
+      "code": "PKG-SUMP-BATTERY",
+      "name": "Battery backup add-on",
+      "material_package_cost": 520.0,
+      "labour_code": null,
+      "labour_extra_cost": 85.0,
+      "includes": [
+        "Battery backup unit",
+        "Connection to pump circuit"
+      ],
+      "active": true
+    },
+    {
+      "code": "PKG-SUMP-ALARM-PRO",
+      "name": "Professional alarm / telemetry add-on",
+      "material_package_cost": 210.0,
+      "labour_code": null,
+      "labour_extra_cost": 45.0,
+      "includes": [
+        "Enhanced audible/visual alarm",
+        "Optional SMS telemetry module"
+      ],
+      "active": true
+    }
+  ],
+  "waste_and_skips": [
+    {
+      "code": "WS-ALLOW-SMALL",
+      "name": "Small waste allowance (bagged)",
+      "unit": "job",
+      "cost_per_unit": 45.0,
+      "notes": "Default for minor DPC / ventilation jobs."
+    },
+    {
+      "code": "WS-SKIP-MIDI",
+      "name": "Midi skip",
+      "unit": "each",
+      "cost_per_unit": 220.0,
+      "notes": "Typical for medium plastering / membrane strip-out."
+    },
+    {
+      "code": "WS-SKIP-BUILDERS",
+      "name": "Builder's skip (6–8 yard)",
+      "unit": "each",
+      "cost_per_unit": 310.0,
+      "notes": "Larger strip-out and boarding waste."
+    },
+    {
+      "code": "WS-SKIP-LARGE",
+      "name": "Large skip (12 yard)",
+      "unit": "each",
+      "cost_per_unit": 420.0,
+      "notes": "Major basement / multi-room clearances."
+    }
+  ],
+  "travel_bands": [
+    {
+      "code": "TRV-LOCAL",
+      "label": "Local",
+      "distance_min_miles": 0,
+      "distance_max_miles": 10,
+      "charge": 0.0,
+      "notes": "Included in day rate / package."
+    },
+    {
+      "code": "TRV-B1",
+      "label": "Band 1",
+      "distance_min_miles": 10,
+      "distance_max_miles": 25,
+      "charge": 65.0,
+      "notes": "South London / near Home Counties."
+    },
+    {
+      "code": "TRV-B2",
+      "label": "Band 2",
+      "distance_min_miles": 25,
+      "distance_max_miles": 50,
+      "charge": 120.0,
+      "notes": "Wider South East coverage."
+    },
+    {
+      "code": "TRV-B3",
+      "label": "Band 3",
+      "distance_min_miles": 50,
+      "distance_max_miles": null,
+      "charge": 195.0,
+      "notes": "50+ miles from Croydon office."
+    }
+  ],
+  "preliminaries": [
+    {
+      "code": "PRE-STD",
+      "name": "Standard preliminaries / setup",
+      "unit": "job",
+      "cost_per_unit": 75.0,
+      "notes": "Protection, setup and basic site preparation."
+    },
+    {
+      "code": "PRE-PARKING",
+      "name": "Parking allowance",
+      "unit": "day",
+      "cost_per_unit": 35.0,
+      "notes": "Central / restricted parking areas."
+    },
+    {
+      "code": "PRE-ULEZ",
+      "name": "ULEZ / congestion allowance",
+      "unit": "day",
+      "cost_per_unit": 12.50,
+      "notes": "Greater London charging zones."
+    },
+    {
+      "code": "PRE-ACCESS",
+      "name": "Restricted access / carrying",
+      "unit": "job",
+      "cost_per_unit": 95.0,
+      "notes": "No vehicle access, flats above ground, awkward routes."
+    },
+    {
+      "code": "PRE-PROTECTION",
+      "name": "Enhanced floor / fixture protection",
+      "unit": "job",
+      "cost_per_unit": 60.0,
+      "notes": "Occupied high-spec properties."
+    },
+    {
+      "code": "PRE-SCAFF-DAY",
+      "name": "Tower / access equipment (day)",
+      "unit": "day",
+      "cost_per_unit": 85.0,
+      "notes": "Where specialist access is required."
+    }
+  ],
+  "surveyors": [
+    {
+      "id": "SUR-01",
+      "name": "James Whitaker",
+      "role": "Senior Surveyor",
+      "base": "Croydon"
+    },
+    {
+      "id": "SUR-02",
+      "name": "Sarah Okonkwo",
+      "role": "Surveyor",
+      "base": "Croydon"
+    },
+    {
+      "id": "SUR-03",
+      "name": "Tom Bradley",
+      "role": "Surveyor",
+      "base": "Maidstone coverage"
+    }
+  ],
+  "customers_and_sites": [
+    {
+      "customer_name": "Mrs Helen Carter",
+      "company_name": null,
+      "email": "helen.carter@example.com",
+      "telephone": "07700 900121",
+      "site_address": "18 Maple Avenue, Bromley",
+      "postcode": "BR1 2NP",
+      "travel_band": "TRV-LOCAL",
+      "notes": "Victorian terrace. Rising damp to front reception wall."
+    },
+    {
+      "customer_name": "Mr David Patel",
+      "company_name": null,
+      "email": "david.patel@example.com",
+      "telephone": "07700 900234",
+      "site_address": "7 Church Lane, Sevenoaks",
+      "postcode": "TN13 1XA",
+      "travel_band": "TRV-B1",
+      "notes": "Basement conversion — cavity drain interest."
+    },
+    {
+      "customer_name": "Greenfield Lettings Ltd",
+      "company_name": "Greenfield Lettings Ltd",
+      "email": "maintenance@greenfieldlettings.example",
+      "telephone": "020 7946 1120",
+      "site_address": "42A Kingsland Road, Hackney",
+      "postcode": "E8 4AA",
+      "travel_band": "TRV-B1",
+      "notes": "Portfolio flat. Condensation and mould complaints."
+    },
+    {
+      "customer_name": "Ms Amira Hassan",
+      "company_name": null,
+      "email": "amira.hassan@example.com",
+      "telephone": "07700 900456",
+      "site_address": "9 The Crescent, Tunbridge Wells",
+      "postcode": "TN1 2LU",
+      "travel_band": "TRV-B2",
+      "notes": "Suspended timber floor — suspected wet rot to joist ends."
+    },
+    {
+      "customer_name": "Oak & Stone Developments",
+      "company_name": "Oak & Stone Developments Ltd",
+      "email": "projects@oakandstone.example",
+      "telephone": "020 7946 3344",
+      "site_address": "Unit B, Wharf Road, Greenwich",
+      "postcode": "SE10 9RB",
+      "travel_band": "TRV-LOCAL",
+      "notes": "New basement waterproofing package with twin pump."
+    }
+  ],
+  "demo_scenarios": [
+    {
+      "id": "DEMO-01",
+      "title": "POC showcase — rising damp + ventilation (Bromley)",
+      "customer_name": "Mrs Helen Carter",
+      "site_address": "18 Maple Avenue, Bromley",
+      "postcode": "BR1 2NP",
+      "surveyor": "James Whitaker",
+      "survey_date": "2026-08-28",
+      "travel_band": "TRV-LOCAL",
+      "waste": "WS-ALLOW-SMALL",
+      "preliminaries": ["PRE-STD", "PRE-ULEZ"],
+      "work_items": [
+        {
+          "work_type": "dpc_replastering",
+          "walls": 1,
+          "wall_length_lm": 12.0,
+          "replaster_height_m": 1.2,
+          "spec": "Chemical DPC + renovating plaster to 1.2 m",
+          "derived": {
+            "dpc_lm": 12.0,
+            "replaster_m2": 14.4
+          }
+        },
+        {
+          "work_type": "ventilation",
+          "items": [
+            {
+              "code": "MAT-EXTRACTOR-100",
+              "quantity": 1,
+              "install": true
+            }
+          ]
+        }
+      ],
+      "expected_behaviour": [
+        "Calculate material + labour + waste + local travel (£0) + prelims",
+        "Apply 35% target margin on DPC portion / 28% on ventilation (or blended per engine rules)",
+        "Enforce £750 minimum job value if calculated sell is lower",
+        "Override sell price downward and show live margin drop"
+      ]
+    },
+    {
+      "id": "DEMO-02",
+      "title": "Basement cavity drain + twin sump (Greenwich)",
+      "customer_name": "Oak & Stone Developments",
+      "site_address": "Unit B, Wharf Road, Greenwich",
+      "postcode": "SE10 9RB",
+      "surveyor": "Sarah Okonkwo",
+      "survey_date": "2026-08-29",
+      "travel_band": "TRV-LOCAL",
+      "waste": "WS-SKIP-BUILDERS",
+      "preliminaries": ["PRE-STD", "PRE-PARKING", "PRE-ULEZ", "PRE-PROTECTION"],
+      "work_items": [
+        {
+          "work_type": "cavity_drain",
+          "wall_area_m2": 48.0,
+          "floor_area_m2": 22.0,
+          "membrane_wall_spec": "MAT-CDM-WALL-8",
+          "membrane_floor_spec": "MAT-CDM-FLOOR-20",
+          "include_battens": true,
+          "include_boarding": true,
+          "drainage_channel_lm": 18.0
+        },
+        {
+          "work_type": "sump_pump",
+          "package": "PKG-SUMP-TWIN",
+          "addons": ["PKG-SUMP-BATTERY", "PKG-SUMP-ALARM-PRO"]
+        }
+      ],
+      "expected_behaviour": [
+        "Package-based sump pricing plus measurement-based membrane",
+        "Apply cavity drain 32% and sump 30% target margins",
+        "Include builder's skip and London prelim allowances"
+      ]
+    },
+    {
+      "id": "DEMO-03",
+      "title": "Timber treatment — Tunbridge Wells",
+      "customer_name": "Ms Amira Hassan",
+      "site_address": "9 The Crescent, Tunbridge Wells",
+      "postcode": "TN1 2LU",
+      "surveyor": "Tom Bradley",
+      "survey_date": "2026-08-30",
+      "travel_band": "TRV-B2",
+      "waste": "WS-SKIP-MIDI",
+      "preliminaries": ["PRE-STD", "PRE-ACCESS"],
+      "work_items": [
+        {
+          "work_type": "timber_treatment",
+          "treatment_area_m2": 28.0,
+          "joist_repairs": 4,
+          "floor_renewal_m2": 6.0,
+          "treatment_type": "Wet rot / fungicidal spray + local joist repairs"
+        }
+      ],
+      "expected_behaviour": [
+        "Apply Band 2 travel (£120)",
+        "33% timber target margin",
+        "Show restricted-access prelim clearly on internal summary"
+      ]
+    },
+    {
+      "id": "DEMO-04",
+      "title": "Condensation control — Hackney letting",
+      "customer_name": "Greenfield Lettings Ltd",
+      "site_address": "42A Kingsland Road, Hackney",
+      "postcode": "E8 4AA",
+      "surveyor": "Sarah Okonkwo",
+      "survey_date": "2026-08-27",
+      "travel_band": "TRV-B1",
+      "waste": "WS-ALLOW-SMALL",
+      "preliminaries": ["PRE-STD", "PRE-ULEZ", "PRE-PARKING"],
+      "work_items": [
+        {
+          "work_type": "ventilation",
+          "items": [
+            {
+              "code": "MAT-PIV-UNIT",
+              "quantity": 1,
+              "install": true
+            },
+            {
+              "code": "MAT-EXTRACTOR-100",
+              "quantity": 2,
+              "install": true
+            }
+          ]
+        }
+      ],
+      "expected_behaviour": [
+        "Unit + install labour model",
+        "28% ventilation margin",
+        "Useful for testing multi-line ventilation quotes"
+      ]
+    },
+    {
+      "id": "DEMO-05",
+      "title": "Minimum job value floor test — small DPC",
+      "customer_name": "Mr David Patel",
+      "site_address": "Flat 2, 3 Station Approach, Orpington",
+      "postcode": "BR6 0RZ",
+      "surveyor": "James Whitaker",
+      "survey_date": "2026-08-26",
+      "travel_band": "TRV-LOCAL",
+      "waste": "WS-ALLOW-SMALL",
+      "preliminaries": ["PRE-STD"],
+      "work_items": [
+        {
+          "work_type": "dpc_replastering",
+          "walls": 1,
+          "wall_length_lm": 2.5,
+          "replaster_height_m": 1.0,
+          "spec": "Localised DPC to chimney breast return"
+        }
+      ],
+      "expected_behaviour": [
+        "Calculated sell may fall below £750",
+        "Engine must lift final sell price to minimum job value",
+        "Internal summary shows min-job adjustment and resulting margin %"
+      ]
+    }
+  ],
+  "quotation_boilerplate": {
+    "assumptions": [
+      "Access to all specified areas will be provided during normal working hours.",
+      "Existing finishes beyond the stated replaster height are excluded unless itemised.",
+      "Electrical supply for pumps and ventilation units is assumed available within reasonable distance of install locations."
+    ],
+    "exclusions": [
+      "Making good of decorations beyond specified plaster/board areas",
+      "Structural repairs not identified at survey",
+      "Asbestos survey or removal",
+      "Building Control / Party Wall fees unless stated",
+      "Out-of-hours working"
+    ],
+    "vat_note": "All prices exclusive of VAT unless otherwise stated. VAT charged at the prevailing UK rate (sample 20%).",
+    "validity_note": "This quotation is valid for 30 days from the date of issue."
+  }
+}
