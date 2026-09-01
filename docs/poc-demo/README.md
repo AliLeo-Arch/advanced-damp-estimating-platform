@@ -50,6 +50,8 @@ Dashboard → Work scope → Measurements → Price review → Quotation (+ PDF)
 
 Note: a dedicated **Customer & site** form screenshot was not included in the supplied set; that step is covered by the estimate header context on steps 02–05 and by the dashboard card for AD-00001.
 
+**Post-POC production screenshots** (login, dashboard table, editor UX) are in [`../production-demo/README.md`](../production-demo/README.md).
+
 ---
 
 ## Original filenames (renamed from)

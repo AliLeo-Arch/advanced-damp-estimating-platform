@@ -480,13 +480,24 @@ export function searchRates(filters: RateSearchFilters = {}) {
 }
 
 export async function listRates(category?: string, includeInactive = false) {
-  const result = await searchRates({
-    category: category || undefined,
-    include_inactive: includeInactive,
-    page_size: 500,
-    sort: "category_asc",
-  });
-  return result.items;
+  const items: RateItem[] = [];
+  const page_size = 200;
+  let page = 1;
+
+  while (true) {
+    const result = await searchRates({
+      category: category || undefined,
+      include_inactive: includeInactive,
+      page,
+      page_size,
+      sort: "category_asc",
+    });
+    items.push(...result.items);
+    if (!result.has_next) break;
+    page += 1;
+  }
+
+  return items;
 }
 
 export function listRateCategories() {
