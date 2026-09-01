@@ -11,6 +11,7 @@ Web app for UK damp-proofing surveyors and office staff: CRM → survey → esti
 | [`Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md`](./Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md) | Production blueprint |
 | [`Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md`](./Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md) | Original POC overview |
 | [`docs/CLIENT_HANDOFF.md`](./docs/CLIENT_HANDOFF.md) | **Client handoff pack** (start here) |
+| [`docs/VERCEL_DEPLOYMENT.md`](./docs/VERCEL_DEPLOYMENT.md) | Deploy frontend + API on Vercel |
 | [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) | Recent features (search, exports, rate table, demos) |
 | [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md) | Estimate/rate search & export endpoints |
 | [`docs/LOCAL_PRODUCTION_ASSUMPTIONS.md`](./docs/LOCAL_PRODUCTION_ASSUMPTIONS.md) | Assumed defaults, lifecycle, permissions |

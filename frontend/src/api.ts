@@ -1,6 +1,5 @@
 import { getToken } from "./auth";
-
-const API_BASE = "";
+import { apiUrl } from "./config";
 
 export type EstimateItem = {
   id: number;
@@ -134,7 +133,7 @@ export type WorkType = { code: string; label: string };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(apiUrl(path), {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -556,13 +555,13 @@ export function getQuotation(id: number) {
 export function quotationPdfUrl(id: number) {
   const token = getToken();
   const q = token ? `?access_token=${encodeURIComponent(token)}` : "";
-  return `/api/estimates/${id}/quotation.pdf${q}`;
+  return apiUrl(`/api/estimates/${id}/quotation.pdf${q}`);
 }
 
 function estimateDownloadUrl(id: number, suffix: string) {
   const token = getToken();
   const q = token ? `?access_token=${encodeURIComponent(token)}` : "";
-  return `/api/estimates/${id}/${suffix}${q}`;
+  return apiUrl(`/api/estimates/${id}/${suffix}${q}`);
 }
 
 export function estimateCsvUrl(id: number) {
@@ -579,7 +578,7 @@ export function estimatesListCsvUrl(filters: EstimateSearchFilters = {}) {
   const token = getToken();
   if (token) params.set("access_token", token);
   const qs = params.toString();
-  return `/api/estimates/export/list.csv${qs ? `?${qs}` : ""}`;
+  return apiUrl(`/api/estimates/export/list.csv${qs ? `?${qs}` : ""}`);
 }
 
 export type HealthResponse = {
@@ -638,7 +637,7 @@ export function getSystemInfo() {
 export async function downloadBackup(filename: string) {
   const token = getToken();
   const response = await fetch(
-    `/api/admin/backups/${encodeURIComponent(filename)}/download`,
+    apiUrl(`/api/admin/backups/${encodeURIComponent(filename)}/download`),
     {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     },

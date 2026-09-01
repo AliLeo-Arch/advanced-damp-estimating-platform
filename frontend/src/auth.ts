@@ -1,3 +1,5 @@
+import { apiUrl } from "./config";
+
 export type AuthUser = {
   id: number;
   email: string;
@@ -34,7 +36,7 @@ export function clearSession() {
 }
 
 export async function loginRequest(email: string, password: string) {
-  const response = await fetch("/api/auth/login", {
+  const response = await fetch(apiUrl("/api/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -53,7 +55,7 @@ export async function fetchSession(): Promise<AuthUser | null> {
   if (!token) return null;
 
   try {
-    const response = await fetch("/api/auth/me", {
+    const response = await fetch(apiUrl("/api/auth/me"), {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) {

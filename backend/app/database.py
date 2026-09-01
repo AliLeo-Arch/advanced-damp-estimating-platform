@@ -6,9 +6,19 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
-Path(settings.database_url.replace("sqlite:///", "")).parent.mkdir(
-    parents=True, exist_ok=True
-)
+
+def _ensure_sqlite_parent(url: str) -> None:
+    if not url.startswith("sqlite:///"):
+        return
+    db_path = Path(url.replace("sqlite:///", ""))
+    try:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Read-only filesystem (e.g. misconfigured path on serverless)
+        pass
+
+
+_ensure_sqlite_parent(settings.database_url)
 
 connect_args = {}
 if settings.database_url.startswith("sqlite"):
