@@ -99,6 +99,6 @@ Bulk import/export remains via PowerShell — see `docs/RATE_IMPORT.md`.
 
 Created by `app.seed_estimates.seed_estimates_if_empty` during `init_db()`:
 
-- `AD-DEMO-01`, `AD-DEMO-04`, `AD-DEMO-05`
+- `EST-DEMO-01`, `EST-DEMO-04`, `EST-DEMO-05`
 
 See `docs/CHANGELOG.md`.

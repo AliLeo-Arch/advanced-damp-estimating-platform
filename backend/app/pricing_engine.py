@@ -1,4 +1,4 @@
-"""Deterministic pricing engine for Advanced Damp POC work types."""
+"""Deterministic pricing engine for configurable trade work types."""
 
 from __future__ import annotations
 
@@ -127,7 +127,7 @@ def _add_labour(
     return total
 
 
-def price_dpc(
+def price_injection_replaster(
     measurements: dict[str, Any],
     rates: dict[str, dict[str, Any]],
     margin: float,
@@ -140,21 +140,21 @@ def price_dpc(
     components: list[LineComponent] = []
 
     materials = 0.0
-    materials += _add_material(components, rates, "MAT-DPC-CREAM", dpc_lm * 0.3)
-    materials += _add_material(components, rates, "MAT-DPC-PLUGS", dpc_lm * 6)
+    materials += _add_material(components, rates, "MAT-INJ-CREAM", dpc_lm * 0.3)
+    materials += _add_material(components, rates, "MAT-INJ-PLUGS", dpc_lm * 6)
     materials += _add_material(components, rates, "MAT-RENOV-PLASTER", replaster_m2 / 2.5)
     materials += _add_material(components, rates, "MAT-SBR-PRIMER", replaster_m2 * 0.2)
 
     labour = 0.0
-    labour += _add_labour(components, rates, "LAB-DPC-LM", dpc_lm)
+    labour += _add_labour(components, rates, "LAB-INJ-LM", dpc_lm)
     labour += _add_labour(components, rates, "LAB-REPLASTER-M2", replaster_m2)
 
     cost = round_money(materials + labour)
     return WorkLineResult(
-        work_type="dpc_replastering",
-        label="Chemical DPC Injection & Replastering",
+        work_type="injection_replaster",
+        label="Injection Treatment & Replastering",
         description=(
-            f"Chemical DPC injection to {dpc_lm:.1f} lm and renovating plaster "
+            f"Injection treatment to {dpc_lm:.1f} lm and renovating plaster "
             f"to {height:.2f} m ({replaster_m2:.1f} m²)."
         ),
         materials_cost=round_money(materials),
@@ -171,7 +171,7 @@ def price_dpc(
     )
 
 
-def price_cavity_drain(
+def price_membrane_waterproofing(
     measurements: dict[str, Any],
     rates: dict[str, dict[str, Any]],
     margin: float,
@@ -200,10 +200,10 @@ def price_cavity_drain(
 
     cost = round_money(materials + labour)
     return WorkLineResult(
-        work_type="cavity_drain",
-        label="Cavity Drain Membrane Systems",
+        work_type="membrane_waterproofing",
+        label="Membrane Waterproofing System",
         description=(
-            f"Cavity drain membrane to {wall:.1f} m² walls and {floor:.1f} m² floor"
+            f"Membrane waterproofing to {wall:.1f} m² walls and {floor:.1f} m² floor"
             + (f", including {channel:.1f} lm drainage channel." if channel else ".")
         ),
         materials_cost=round_money(materials),
@@ -216,7 +216,7 @@ def price_cavity_drain(
     )
 
 
-def price_sump(
+def price_pump_package(
     measurements: dict[str, Any],
     rates: dict[str, dict[str, Any]],
     margin: float,
@@ -284,9 +284,9 @@ def price_sump(
 
     cost = round_money(materials + labour)
     return WorkLineResult(
-        work_type="sump_pump",
-        label="Sump & Pump Installations",
-        description=package["name"] if package else "Sump & pump package",
+        work_type="pump_package",
+        label="Pump / Drainage Package",
+        description=package["name"] if package else "Pump / drainage package package",
         materials_cost=round_money(materials),
         labour_cost=round_money(labour),
         line_cost=cost,
@@ -297,7 +297,7 @@ def price_sump(
     )
 
 
-def price_timber(
+def price_timber_remediation(
     measurements: dict[str, Any],
     rates: dict[str, dict[str, Any]],
     margin: float,
@@ -318,10 +318,10 @@ def price_timber(
 
     cost = round_money(materials + labour)
     return WorkLineResult(
-        work_type="timber_treatment",
-        label="Timber Treatment",
+        work_type="timber_remediation",
+        label="Timber Remedial Treatment",
         description=(
-            f"Timber treatment to {area:.1f} m²"
+            f"Timber remedial treatment to {area:.1f} m²"
             + (f", {int(joists)} joist repair(s)" if joists else "")
             + (f", {floor:.1f} m² floor renewal" if floor else "")
             + "."
@@ -336,7 +336,7 @@ def price_timber(
     )
 
 
-def price_ventilation(
+def price_ventilation_installation(
     measurements: dict[str, Any],
     rates: dict[str, dict[str, Any]],
     margin: float,
@@ -362,8 +362,8 @@ def price_ventilation(
 
     cost = round_money(materials + labour)
     return WorkLineResult(
-        work_type="ventilation",
-        label="Condensation & Ventilation",
+        work_type="ventilation_installation",
+        label="Ventilation Equipment",
         description=", ".join(names) if names else "Ventilation works",
         materials_cost=round_money(materials),
         labour_cost=round_money(labour),
@@ -376,11 +376,11 @@ def price_ventilation(
 
 
 PRICERS = {
-    "dpc_replastering": price_dpc,
-    "cavity_drain": price_cavity_drain,
-    "sump_pump": price_sump,
-    "timber_treatment": price_timber,
-    "ventilation": price_ventilation,
+    "injection_replaster": price_injection_replaster,
+    "membrane_waterproofing": price_membrane_waterproofing,
+    "pump_package": price_pump_package,
+    "timber_remediation": price_timber_remediation,
+    "ventilation_installation": price_ventilation_installation,
 }
 
 
@@ -459,24 +459,24 @@ def validate_work_items(work_items: list[dict[str, Any]]) -> list[str]:
         if work_type not in PRICERS:
             warnings.append(f"Unknown work type skipped: {work_type}")
             continue
-        if work_type == "dpc_replastering":
+        if work_type == "injection_replaster":
             if float(measurements.get("wall_length_lm") or 0) <= 0:
-                warnings.append("DPC: wall length should be greater than zero.")
+                warnings.append("Injection: wall length should be greater than zero.")
             if float(measurements.get("replaster_height_m") or 0) <= 0:
-                warnings.append("DPC: replaster height should be greater than zero.")
-        elif work_type == "cavity_drain":
+                warnings.append("Injection: replaster height should be greater than zero.")
+        elif work_type == "membrane_waterproofing":
             if (
                 float(measurements.get("wall_area_m2") or 0) <= 0
                 and float(measurements.get("floor_area_m2") or 0) <= 0
             ):
                 warnings.append("Cavity drain: enter wall and/or floor area.")
-        elif work_type == "sump_pump":
+        elif work_type == "pump_package":
             if not measurements.get("package"):
-                warnings.append("Sump & pump: select a package.")
-        elif work_type == "timber_treatment":
+                warnings.append("Pump / drainage package: select a package.")
+        elif work_type == "timber_remediation":
             if float(measurements.get("treatment_area_m2") or 0) <= 0:
                 warnings.append("Timber: treatment area should be greater than zero.")
-        elif work_type == "ventilation":
+        elif work_type == "ventilation_installation":
             items = list(measurements.get("items") or [])
             if not any(float(i.get("quantity") or 0) > 0 for i in items):
                 warnings.append("Ventilation: add at least one unit with quantity.")
@@ -497,7 +497,7 @@ def calculate_estimate(
     """
     Production pricing with job-level allowance allocation (Option A).
 
-    Policy (assumed until Advanced Damp confirms):
+    Policy (assumed until the deploying contractor confirms):
     1. Price each work type on direct materials + labour.
     2. Allocate waste / travel / prelims across lines by direct cost weight.
     3. Apply each line's target margin to (direct + allocated job cost).

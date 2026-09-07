@@ -4,14 +4,14 @@ Assumed credentials for local development (replace in real deployment):
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@advanceddamp.co.uk` | `AdvancedDamp1!` |
-| Owner | `owner@advanceddamp.co.uk` | `OwnerDamp1!` |
-| Surveyor | `james.whitaker@advanceddamp.co.uk` | `Surveyor1!` |
-| Office | `office@advanceddamp.co.uk` | `OfficeDamp1!` |
+| Admin | `admin@northbridge-demo.example` | `DemoAdmin1!` |
+| Owner | `owner@northbridge-demo.example` | `DemoOwner1!` |
+| Surveyor | `james.whitaker@northbridge-demo.example` | `Surveyor1!` |
+| Office | `office@northbridge-demo.example` | `DemoOffice1!` |
 
 ## Assumed commercial defaults (Phase B)
 
-These are professional UK placeholders until Advanced Damp supplies live policy. Editable in **Rates** (owner/admin):
+These are professional UK placeholders until the deploying contractor supplies live policy. Editable in **Rates** (owner/admin):
 
 | Setting | Assumed value |
 |---|---|
@@ -26,11 +26,11 @@ These are professional UK placeholders until Advanced Damp supplies live policy.
 
 | Work type | Target margin |
 |---|---|
-| Chemical DPC & replastering | 35% |
-| Cavity drain membrane | 32% |
-| Sump & pump | 30% |
-| Timber treatment | 33% |
-| Condensation & ventilation | 34% |
+| Injection treatment & replastering | 35% |
+| Membrane waterproofing | 32% |
+| Pump / drainage package | 30% |
+| Timber remedial treatment | 33% |
+| Ventilation equipment | 34% |
 
 Material / labour / travel / waste / prelim rate lines are seeded from `backend/data/sample_seed.json` (illustrative costs — replace via Rates UI).
 
@@ -40,7 +40,7 @@ Material / labour / travel / waste / prelim rate lines are seeded from `backend/
 
 ## Job-level allowance policy (Phase C — assumed)
 
-**Option A — allocate by direct cost weight** (assumed until Advanced Damp confirms):
+**Option A — allocate by direct cost weight** (assumed until the deploying contractor confirms):
 
 1. Price each work type on materials + labour only.  
 2. Allocate waste / travel / preliminaries across work lines by each line’s share of direct cost.  
@@ -57,7 +57,7 @@ Approval rules (assumed):
 - Sell-price override → `review_required` (owner/admin must approve)
 - Actual margin below target → `review_required`
 - Margin below minimum permitted (default 20%) → quotation blocked until sell is raised
-- Quoted / accepted / declined / expired / closed estimates are **locked**; use **Create revision** (`AD-00001-R2`) to continue
+- Quoted / accepted / declined / expired / closed estimates are **locked**; use **Create revision** (`EST-00001-R2`) to continue
 
 ## Quotation / PDF (Phase E — assumed)
 
@@ -65,7 +65,7 @@ Approval rules (assumed):
 - VAT rate snapshotted when marked **quoted**
 - Work-type line amounts always reconcile to subtotal
 - Configurable terms: payment, assumptions, exclusions, guarantee, survey-fee credit, acceptance
-- PDF filename: `AD-00001-Mrs-Smith-Quotation.pdf`
+- PDF filename: `EST-00001-Mrs-Smith-Quotation.pdf`
 - No cost/margin leakage on customer PDF
 
 ## Actual cost (Phase F — assumed)
@@ -77,14 +77,15 @@ Available when estimate is **quoted**, **accepted**, or **closed**:
 - Variance table: estimated vs actual vs variance for cost, revenue, margin £/%
 - Editable by owner/admin/accounts (`manage_actuals` permission)
 
-Database file: `backend/data/advanced_damp_local_prod.db`
+Database file: `backend/data/trade_estimating_local_prod.db`
 
-## Production hardening (Phase G — assumed)
+## Production hardening (Phase G / product Phase 8 — assumed)
 
-- **Backups:** SQLite copies in `backend/data/backups/` (`advanced_damp-YYYYMMDD-HHMMSS.db`)
+- **Backups:** Online SQLite backups in `backend/data/backups/` (`trade_estimating-YYYYMMDD-HHMMSS.db`); auto-prunes to latest 30
 - **Pre-restore safety copy:** created automatically before any restore
 - **Admin UI / API:** owner/admin with `backup` permission (`/admin` page or `POST /api/admin/backups`)
-- **PowerShell:** `scripts/backup.ps1`, `scripts/restore.ps1`
-- **Logs:** `backend/data/logs/app.log`
+- **PowerShell:** `scripts/backup.ps1`, `scripts/restore.ps1`, `scripts/register-daily-backup.ps1`
+- **Logs:** `backend/data/logs/app.log` (rotating)
+- **Login throttle:** in-process lockout after repeated failed logins
 - **Health:** `GET /health` returns version, environment, `database_ok`
 - **Policy:** daily backup while in use; test restore monthly; keep off-machine copies

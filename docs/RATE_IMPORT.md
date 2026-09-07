@@ -43,7 +43,7 @@ Bulk CSV remains the recommended path for large commercial updates.
 
 ```powershell
 .\scripts\export-rates.ps1
-.\scripts\export-rates.ps1 -OutputPath "D:\Rates\advanced_damp_live.csv"
+.\scripts\export-rates.ps1 -OutputPath "D:\Rates\trade_estimating_live.csv"
 .\scripts\export-rates.ps1 -IncludeInactive
 ```
 
@@ -57,7 +57,7 @@ Default output: `backend/data/rates_export.csv`
 
 ```powershell
 .\scripts\import-rates.ps1 backend\data\rates_import_template.csv -DryRun
-.\scripts\import-rates.ps1 path\to\advanced_damp_rates.csv
+.\scripts\import-rates.ps1 path\to\trade_estimating_rates.csv
 ```
 
 From `backend/`:

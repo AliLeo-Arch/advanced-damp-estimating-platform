@@ -14,6 +14,16 @@ ESTIMATE_COLUMNS = {
     "quote_issued_at": "DATETIME",
     "quote_valid_until": "DATETIME",
     "quote_vat_rate": "FLOAT",
+    "quotation_snapshot_json": "TEXT DEFAULT '{}'",
+    "accepted_at": "DATETIME",
+    "accepted_by_name": "TEXT DEFAULT ''",
+    "acceptance_method": "TEXT DEFAULT ''",
+    "acceptance_po_reference": "TEXT DEFAULT ''",
+    "acceptance_notes": "TEXT DEFAULT ''",
+}
+
+RATE_ITEM_COLUMNS = {
+    "effective_date": "TEXT DEFAULT ''",
 }
 
 PRICING_SETTINGS_COLUMNS = {
@@ -22,6 +32,13 @@ PRICING_SETTINGS_COLUMNS = {
     "guarantee_wording": "TEXT DEFAULT ''",
     "survey_fee_credit_wording": "TEXT DEFAULT ''",
     "acceptance_instructions": "TEXT DEFAULT ''",
+    "company_display_name": "TEXT DEFAULT ''",
+    "company_phone": "TEXT DEFAULT ''",
+    "company_email": "TEXT DEFAULT ''",
+    "company_address": "TEXT DEFAULT ''",
+    "company_website": "TEXT DEFAULT ''",
+    "company_tagline": "TEXT DEFAULT ''",
+    "quote_prefix": "TEXT DEFAULT 'EST'",
 }
 
 
@@ -38,4 +55,5 @@ def ensure_sqlite_columns(engine: Engine) -> None:
         return
     with engine.begin() as conn:
         _add_missing(conn, "estimates", ESTIMATE_COLUMNS)
+        _add_missing(conn, "rate_items", RATE_ITEM_COLUMNS)
         _add_missing(conn, "pricing_settings", PRICING_SETTINGS_COLUMNS)

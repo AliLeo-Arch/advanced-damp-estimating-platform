@@ -1,4 +1,4 @@
-# Changelog — Advanced Damp Estimating Platform
+  Changelog — Trade Estimating & Quoting Platform
 
 **Current version:** 1.0.0-local-prod  
 **Document date:** 31 August 2026
@@ -7,21 +7,21 @@ This changelog covers post–foundation enhancements delivered after Phases A–
 
 ---
 
-## 1.0.0-local-prod — UX & operational polish (August 2026)
+   1.0.0-local-prod — UX & operational polish (August 2026)
 
-### Demo estimates for testing
+    Demo estimates for testing
 
 On first database init (and whenever demo references are missing), three priced estimates are seeded from `backend/data/sample_seed.json`:
 
 | Reference | Customer | Status | Notes |
 |---|---|---|---|
-| `AD-DEMO-01` | Mrs Helen Carter | Ready to quote | Bromley DPC scenario (DEMO-01) |
-| `AD-DEMO-05` | Mr David Patel | Priced | Minimum job £750 (DEMO-05) |
-| `AD-DEMO-04` | Greenfield Lettings Ltd | Priced | Ventilation mid-size (DEMO-04) |
+| `EST-DEMO-01` | Ms Emma Thompson | Ready to quote | Reading DPC scenario (DEMO-01) |
+| `EST-DEMO-05` | Mr Oliver Grant | Priced | Minimum job £750 (DEMO-05) |
+| `EST-DEMO-04` | Cedar Property Management Ltd | Priced | Ventilation mid-size (DEMO-04) |
 
 Seeding is idempotent by reference — existing user estimates are not overwritten.
 
-### Estimate exports
+    Estimate exports
 
 | Format | Where | Contents |
 |---|---|---|
@@ -32,7 +32,7 @@ Seeding is idempotent by reference — existing user estimates are not overwritt
 
 Excel export requires `openpyxl` (listed in `backend/requirements.txt`).
 
-### Estimates dashboard — advanced search & pagination
+    Estimates dashboard — advanced search & pagination
 
 - Text by reference, customer, company, site, postcode, surveyor, notes
 - Filter by status (multi-select chips), surveyor, survey date range, sell price range
@@ -40,7 +40,7 @@ Excel export requires `openpyxl` (listed in `backend/requirements.txt`).
 - URL-persisted filters (bookmarkable)
 - CSV export respects active filters
 
-### Rate table — search, sort & pagination
+    Rate table — search, sort & pagination
 
 - Server-side search across code, name, category, unit, notes
 - Category filter, inactive toggle, sort options
@@ -48,20 +48,20 @@ Excel export requires `openpyxl` (listed in `backend/requirements.txt`).
 - Sticky header, category pills, inline edit row
 - Collapsible “Add rate” form
 
-### Estimate editor UX
+    Estimate editor UX
 
 - Command bar with status, sell, margin, and grouped actions
 - Clickable workflow stepper (jump between accessible steps)
 - Segmented PDF / CSV / Excel export on quotation
 - Colour-coded status pills
 
-### Auth & loading
+    Auth & loading
 
 - Guest-only login redirect when already signed in
 - Session validation via `/api/auth/me` on boot
 - Shared loading skeletons and loading buttons
 
-### Automated tests
+    Automated tests
 
 `.\scripts\verify-delivery.ps1` now expects **34 tests** (was 26), including:
 
@@ -73,7 +73,7 @@ Plus **6 benchmark scenarios** unchanged.
 
 ---
 
-## Earlier foundation (Phases A–G)
+   Earlier foundation (Phases A–G)
 
 Auth/JWT, CRM, rate admin, pricing engine, lifecycle/approvals/revisions, quotation PDF, job actuals, backups, logging, health, admin UI, mobile UX, rate CSV import/export, production single-port mode.
 

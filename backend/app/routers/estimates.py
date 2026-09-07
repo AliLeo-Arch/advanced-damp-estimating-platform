@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -79,8 +80,11 @@ def _search_params_from_query(
 
 
 def _next_reference(db: Session) -> str:
+    from app.company import company_profile_from_db
+
+    prefix = company_profile_from_db(db).quote_prefix or "EST"
     count = db.query(Estimate).count() + 1
-    return f"AD-{count:05d}"
+    return f"{prefix}-{count:05d}"
 
 
 def _get_estimate_or_404(estimate_id: int, db: Session) -> Estimate:
@@ -169,7 +173,9 @@ def download_estimates_list_csv(
     _: User = Depends(get_current_user_from_header_or_query),
     params: EstimateSearchParams = Depends(_search_params_from_query),
 ):
-    query = db.query(Estimate)
+    from sqlalchemy.orm import joinedload
+
+    query = db.query(Estimate).options(joinedload(Estimate.actuals))
     query = apply_estimate_filters(query, params.normalized())
     rows = query.order_by(Estimate.created_at.desc()).all()
     data = render_estimates_list_csv(rows)
@@ -361,9 +367,24 @@ def transition_estimate(
     if payload.status == EstimateStatus.QUOTED.value:
         assert_can_issue_quotation(estimate, db)
         lock_quotation_snapshot(db, estimate)
+    if payload.status == EstimateStatus.ACCEPTED.value:
+        estimate.accepted_at = datetime.utcnow()
+        estimate.accepted_by_name = (
+            payload.accepted_by_name.strip()
+            or user.full_name
+            or user.email
+            or ""
+        )
+        estimate.acceptance_method = (
+            payload.acceptance_method.strip() or "verbal"
+        )
+        estimate.acceptance_po_reference = payload.acceptance_po_reference.strip()
+        estimate.acceptance_notes = payload.acceptance_notes.strip() or payload.notes.strip()
     estimate.status = payload.status
-    if payload.notes:
+    if payload.notes and payload.status != EstimateStatus.ACCEPTED.value:
         estimate.notes = f"{estimate.notes}\n{payload.notes}".strip()
+    elif payload.notes and payload.status == EstimateStatus.ACCEPTED.value and not estimate.acceptance_notes:
+        estimate.acceptance_notes = payload.notes.strip()
     db.commit()
     db.refresh(estimate)
     write_audit(
@@ -371,7 +392,13 @@ def transition_estimate(
         action="estimate_transition",
         entity_type="estimate",
         entity_id=estimate.id,
-        detail={"reference": estimate.reference, "status": estimate.status},
+        detail={
+            "reference": estimate.reference,
+            "status": estimate.status,
+            "accepted_by_name": estimate.accepted_by_name,
+            "acceptance_method": estimate.acceptance_method,
+            "acceptance_po_reference": estimate.acceptance_po_reference,
+        },
         actor=user,
     )
     return serialize_estimate(estimate)

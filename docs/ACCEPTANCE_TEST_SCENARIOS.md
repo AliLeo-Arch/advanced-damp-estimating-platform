@@ -10,7 +10,7 @@ Use these scenarios before calling the platform commercially production-ready. T
 
 ## Scenario A — DPC & replastering
 
-**Seed reference:** DEMO-01 (Bromley rising damp + extractor)
+**Seed reference:** DEMO-01 (Reading rising damp + extractor)
 
 | Step | Action | Expected |
 |---|---|---|
@@ -23,7 +23,7 @@ Use these scenarios before calling the platform commercially production-ready. T
 
 ## Scenario B — Cavity drain + pump
 
-**Seed reference:** DEMO-02 (Greenwich basement package)
+**Seed reference:** DEMO-02 (Reading basement package)
 
 | Step | Action | Expected |
 |---|---|---|
@@ -34,9 +34,9 @@ Use these scenarios before calling the platform commercially production-ready. T
 
 ---
 
-## Scenario C — Timber treatment
+## Scenario C — Timber remedial treatment
 
-**Seed reference:** DEMO-03 (Tunbridge Wells wet rot)
+**Seed reference:** DEMO-03 (Newbury wet rot)
 
 | Step | Action | Expected |
 |---|---|---|
@@ -48,7 +48,7 @@ Use these scenarios before calling the platform commercially production-ready. T
 
 ## Scenario D — Ventilation (multi-unit)
 
-**Seed reference:** DEMO-04 (Hackney PIV + 2 extractors)
+**Seed reference:** DEMO-04 (Reading PIV + 2 extractors)
 
 | Step | Action | Expected |
 |---|---|---|
@@ -106,7 +106,7 @@ Use these scenarios before calling the platform commercially production-ready. T
 | Step | Action | Expected |
 |---|---|---|
 | 1 | Mark estimate quoted | Locked for edit |
-| 2 | Create revision R2 | Reference `AD-00001-R2` |
+| 2 | Create revision R2 | Reference `EST-00001-R2` |
 | 3 | Modify scope on R2 | Original R1 still accessible |
 
 ---
@@ -125,9 +125,9 @@ Use these scenarios before calling the platform commercially production-ready. T
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Fresh DB / restart backend | `AD-DEMO-01`, `AD-DEMO-04`, `AD-DEMO-05` appear on Estimates |
-| 2 | Open `AD-DEMO-01` | Ready to quote; sell ~£2,152.67 on seed rates |
-| 3 | Open `AD-DEMO-05` | Min job applied; sell £750.00 |
+| 1 | Fresh DB / restart backend | `EST-DEMO-01`, `EST-DEMO-04`, `EST-DEMO-05` appear on Estimates |
+| 2 | Open `EST-DEMO-01` | Ready to quote; sell ~£2,152.67 on seed rates |
+| 3 | Open `EST-DEMO-05` | Min job applied; sell £750.00 |
 
 ---
 
@@ -135,7 +135,7 @@ Use these scenarios before calling the platform commercially production-ready. T
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | Search `Greenfield` on Estimates | Matching cards only |
+| 1 | Search `Cedar` on Estimates | Matching cards only |
 | 2 | Filter status **Accepted** | List narrows; URL contains `status=` |
 | 3 | Change per page to 10; add enough estimates | Previous / Next appear |
 | 4 | Export results (CSV) | File contains filtered rows |
@@ -146,7 +146,7 @@ Use these scenarios before calling the platform commercially production-ready. T
 
 | Step | Action | Expected |
 |---|---|---|
-| 1 | On `AD-DEMO-01` Quotation step | Export control shows PDF / CSV / Excel |
+| 1 | On `EST-DEMO-01` Quotation step | Export control shows PDF / CSV / Excel |
 | 2 | Download CSV and Excel | Files open; Excel has Quotation + Internal sheets |
 | 3 | Rates → search a known code | Matching row on current page |
 | 4 | Change category / sort / page size | Table updates without full-page reload of unrelated data |

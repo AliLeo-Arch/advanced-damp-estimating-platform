@@ -20,10 +20,10 @@ def _session() -> Session:
 def _seed_rows(db: Session) -> None:
     rows = [
         Estimate(
-            reference="AD-00001",
-            customer_name="Mrs Helen Carter",
-            site_address="12 Oak Road",
-            postcode="BR1 3AA",
+            reference="EST-00001",
+            customer_name="Ms Emma Thompson",
+            site_address="24 Cedar Road",
+            postcode="RG1 4AB",
             surveyor="James Whitaker",
             survey_date="2026-08-01",
             status=EstimateStatus.READY_TO_QUOTE.value,
@@ -34,10 +34,10 @@ def _seed_rows(db: Session) -> None:
             margin_percent=44.0,
         ),
         Estimate(
-            reference="AD-00002",
-            customer_name="Mr David Patel",
-            site_address="5 Station Parade",
-            postcode="CR0 2QQ",
+            reference="EST-00002",
+            customer_name="Mr Oliver Grant",
+            site_address="15 Queens Road",
+            postcode="RG1 4AY",
             surveyor="James Whitaker",
             survey_date="2026-07-15",
             status=EstimateStatus.PRICED.value,
@@ -48,11 +48,11 @@ def _seed_rows(db: Session) -> None:
             margin_percent=33.3,
         ),
         Estimate(
-            reference="AD-DEMO-04",
-            customer_name="Greenfield Lettings Ltd",
-            site_address="42A Kingsland Road",
-            postcode="E8 4AA",
-            surveyor="Sarah Cole",
+            reference="EST-DEMO-04",
+            customer_name="Cedar Property Management Ltd",
+            site_address="8 Market Place",
+            postcode="RG1 2DE",
+            surveyor="Sarah Okonkwo",
             survey_date="2026-06-20",
             status=EstimateStatus.ACCEPTED.value,
             notes="",
@@ -70,10 +70,10 @@ def test_search_by_customer_and_postcode():
     db = _session()
     _seed_rows(db)
     rows, total, _ = search_estimates(
-        db, EstimateSearchParams(q="Greenfield", page=1, page_size=10)
+        db, EstimateSearchParams(q="Cedar Property", page=1, page_size=10)
     )
     assert total == 1
-    assert rows[0].reference == "AD-DEMO-04"
+    assert rows[0].reference == "EST-DEMO-04"
 
 
 def test_filter_status_and_sell_range():
@@ -89,8 +89,8 @@ def test_filter_status_and_sell_range():
         ),
     )
     assert total == 2
-    assert rows[0].reference == "AD-00001"
-    assert rows[1].reference == "AD-00002"
+    assert rows[0].reference == "EST-00001"
+    assert rows[1].reference == "EST-00002"
 
 
 def test_pagination_pages():

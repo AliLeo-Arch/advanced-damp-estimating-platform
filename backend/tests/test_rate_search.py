@@ -20,8 +20,8 @@ def _session() -> Session:
 def _seed_rows(db: Session) -> None:
     rows = [
         RateItem(
-            code="MAT-DPC-CREAM",
-            name="DPC injection cream",
+            code="MAT-INJ-CREAM",
+            name="Injection cream",
             category="materials",
             unit="tube",
             cost_per_unit=18.5,

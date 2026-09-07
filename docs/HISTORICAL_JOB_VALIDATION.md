@@ -1,6 +1,6 @@
 # Historical Job Validation
 
-Before go-live, Advanced Damp should re-estimate **5–10 real issued jobs** and compare against agreed commercial pricing. Seed/demo scenarios prove the engine works; this step proves **live rates and policy** match how the company actually quotes.
+Before go-live, the deploying contractor should re-estimate **5–10 real issued jobs** and compare against agreed commercial pricing. Seed/demo scenarios prove the engine works; this step proves **live rates and policy** match how the company actually quotes.
 
 ## Tolerance policy (recommended)
 
@@ -18,7 +18,7 @@ Document the agreed tolerance in writing before validation starts.
 
 | Field | Value |
 |---|---|
-| Historical reference | e.g. AD-00421 |
+| Historical reference | e.g. EST-00421 |
 | Survey date | |
 | Work types | |
 | Validator | |
@@ -70,14 +70,14 @@ Example entry:
 ```json
 {
   "id": "HIST-00421",
-  "title": "Mrs Smith — Bromley DPC 2025",
-  "reference": "AD-00421",
+  "title": "Ms Emma Thompson — Reading DPC demo",
+  "reference": "EST-00421",
   "travel_band": "TRV-LOCAL",
   "waste": "WS-ALLOW-SMALL",
   "preliminaries": ["PRE-STD", "PRE-ULEZ"],
   "work_items": [
     {
-      "work_type": "dpc_replastering",
+      "work_type": "injection_replaster",
       "walls": 1,
       "wall_length_lm": 10.5,
       "replaster_height_m": 1.2
@@ -97,11 +97,11 @@ Example entry:
 |---|---|---:|
 | DEMO-01 | Rising damp + ventilation | £2,152.67 |
 | DEMO-02 | Cavity drain + twin sump | £13,152.65 |
-| DEMO-03 | Timber treatment | £2,351.46 |
+| DEMO-03 | Timber remedial treatment | £2,351.46 |
 | DEMO-04 | PIV + extractors | £1,607.64 |
 | DEMO-05 | Minimum job floor | £750.00 |
 
-These values **will change** when real Advanced Damp rates replace seed data. Re-run `validate_benchmarks.py` after rate import and update expected figures.
+These values **will change** when real contractor rates replace seed data. Re-run `validate_benchmarks.py` after rate import and update expected figures.
 
 ---
 

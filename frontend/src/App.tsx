@@ -8,6 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { AuthUser, clearSession, fetchSession, getStoredUser } from "./auth";
+import { CompanyProfile, getCompanyProfile } from "./api";
 import { LoadingState } from "./components/Loading";
 import CustomersPage from "./pages/CustomersPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -16,6 +17,16 @@ import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import RatesPage from "./pages/RatesPage";
 
+const FALLBACK_COMPANY: CompanyProfile = {
+  name: "Northbridge Property Services Ltd",
+  phone: "0118 496 0123",
+  email: "info@northbridge-demo.example",
+  address: "12 Station Approach, Reading RG1 1LG",
+  website: "https://www.northbridge-demo.example",
+  tagline: "Specialist Trade Estimating & Quoting",
+  quote_prefix: "EST",
+  app_name: "Trade Estimating & Quoting",
+};
 function Protected({
   user,
   children,
@@ -56,6 +67,7 @@ export default function App() {
   const [user, setUser] = useState<AuthUser | null>(getStoredUser());
   const [booting, setBooting] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [company, setCompany] = useState<CompanyProfile>(FALLBACK_COMPANY);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +82,21 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getCompanyProfile();
+        if (!cancelled) setCompany(profile);
+      } catch {
+        /* keep fallback branding */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -92,7 +119,7 @@ export default function App() {
   if (booting) {
     return (
       <div className="app-shell app-boot">
-        <LoadingState label="Starting Advanced Damp Estimating…" />
+        <LoadingState label="Starting Trade Estimating & Quoting…" />
       </div>
     );
   }
@@ -100,15 +127,15 @@ export default function App() {
   return (
     <div className={`app-shell${location.pathname === "/login" ? " is-login" : ""}`}>
       <header className="app-header">
-        <Link to="/" className="brand" aria-label="Advanced Damp Estimating home">
+        <Link to="/" className="brand" aria-label="Trade Estimating & Quoting home">
           <img
             className="brand-logo"
-            src="https://advanceddamp.co.uk/wp-content/uploads/2026/05/Advanced-Damp-1-copy.png"
-            alt="Advanced Damp"
+            src="/brand/trade-estimating-mark.svg"
+            alt="Trade Estimating"
           />
           <span className="brand-text">
-            <span className="brand-mark">Advanced Damp</span>
-            <span className="brand-sub">Estimating</span>
+            <span className="brand-mark">Trade Estimating</span>
+            <span className="brand-sub">Quoting</span>
           </span>
         </Link>
 
@@ -269,11 +296,15 @@ export default function App() {
 
       <footer className="app-footer">
         <div className="app-footer-inner">
-          <span>Advanced Damp Ltd · Local production foundation</span>
           <span>
-            <a href="tel:03003737251">0300 373 7251</a>
+            {company.name} · Local production foundation
+          </span>
+          <span>
+            <a href={`tel:${company.phone.replace(/\s+/g, "")}`}>
+              {company.phone}
+            </a>
             {" · "}
-            <a href="mailto:info@advanceddamp.co.uk">info@advanceddamp.co.uk</a>
+            <a href={`mailto:${company.email}`}>{company.email}</a>
           </span>
         </div>
       </footer>

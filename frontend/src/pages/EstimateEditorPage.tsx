@@ -65,6 +65,17 @@ function formatStatusLabel(status: string) {
   return status.replaceAll("_", " ");
 }
 
+/** Cost overruns are bad; revenue/margin increases are good. */
+function varianceTone(label: string, variance: number) {
+  if (variance === 0) return "";
+  const higherIsBetter =
+    label.startsWith("Revenue") || label.startsWith("Margin");
+  if (higherIsBetter) {
+    return variance > 0 ? "is-success" : "is-danger";
+  }
+  return variance > 0 ? "is-danger" : "is-success";
+}
+
 function statusTone(status: string) {
   switch (status) {
     case "ready_to_quote":
@@ -73,7 +84,12 @@ function statusTone(status: string) {
     case "accepted":
       return "is-success";
     case "review_required":
+    case "expired":
       return "is-warning";
+    case "declined":
+      return "is-warning";
+    case "closed":
+      return "is-priced";
     case "priced":
       return "is-priced";
     default:
@@ -87,9 +103,9 @@ function stepOrder(stepId: Step) {
 
 const defaultMeasurements = (workType: string): Record<string, unknown> => {
   switch (workType) {
-    case "dpc_replastering":
+    case "injection_replaster":
       return { walls: 1, wall_length_lm: 12, replaster_height_m: 1.2 };
-    case "cavity_drain":
+    case "membrane_waterproofing":
       return {
         wall_area_m2: 20,
         floor_area_m2: 10,
@@ -97,11 +113,11 @@ const defaultMeasurements = (workType: string): Record<string, unknown> => {
         include_boarding: true,
         drainage_channel_lm: 0,
       };
-    case "sump_pump":
+    case "pump_package":
       return { package: "PKG-SUMP-STD", addons: [] };
-    case "timber_treatment":
+    case "timber_remediation":
       return { treatment_area_m2: 20, joist_repairs: 0, floor_renewal_m2: 0 };
-    case "ventilation":
+    case "ventilation_installation":
       return {
         items: [{ code: "MAT-EXTRACTOR-100", quantity: 1, install: true }],
       };
@@ -158,6 +174,13 @@ export default function EstimateEditorPage() {
     other_actual: "",
     revenue_actual: "",
     notes: "",
+  });
+  const [showAcceptForm, setShowAcceptForm] = useState(false);
+  const [acceptForm, setAcceptForm] = useState({
+    accepted_by_name: "",
+    acceptance_method: "email",
+    acceptance_po_reference: "",
+    acceptance_notes: "",
   });
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
   const [rates, setRates] = useState<RateItem[]>([]);
@@ -503,11 +526,34 @@ export default function EstimateEditorPage() {
     setSaving(true);
     setError(null);
     try {
-      const updated = await transitionEstimate(estimate.id, "accepted");
+      const updated = await transitionEstimate(estimate.id, "accepted", "", {
+        accepted_by_name: acceptForm.accepted_by_name.trim(),
+        acceptance_method: acceptForm.acceptance_method,
+        acceptance_po_reference: acceptForm.acceptance_po_reference.trim(),
+        acceptance_notes: acceptForm.acceptance_notes.trim(),
+      });
       setEstimate(updated);
+      setShowAcceptForm(false);
       setStep("actuals");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not mark as accepted");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onLifecycleTransition(status: string, notes = "") {
+    if (!estimate) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await transitionEstimate(estimate.id, status, notes);
+      setEstimate(updated);
+      setShowAcceptForm(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : `Could not mark as ${status}`,
+      );
     } finally {
       setSaving(false);
     }
@@ -645,15 +691,54 @@ export default function EstimateEditorPage() {
                     Mark as quoted
                   </button>
                 ) : (
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void onMarkAccepted()}
-                  >
-                    Mark as accepted
-                  </button>
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      disabled={saving}
+                      onClick={() => setShowAcceptForm((open) => !open)}
+                    >
+                      {showAcceptForm ? "Hide accept form" : "Mark as accepted"}
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void onLifecycleTransition("declined")}
+                    >
+                      Declined
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void onLifecycleTransition("expired")}
+                    >
+                      Expired
+                    </button>
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void onLifecycleTransition("closed")}
+                    >
+                      Close
+                    </button>
+                  </>
                 )}
+              </div>
+            ) : null}
+            {["accepted", "declined", "expired"].includes(estimate.status) ? (
+              <div className="action-group" role="group" aria-label="Close job">
+                <span className="action-group-label">Outcome</span>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void onLifecycleTransition("closed")}
+                >
+                  Close estimate
+                </button>
               </div>
             ) : null}
             {showActuals ? (
@@ -691,6 +776,111 @@ export default function EstimateEditorPage() {
         <div className="info-banner">
           This estimate is locked ({estimate?.status.replaceAll("_", " ")}).
           Create a revision to make commercial changes.
+        </div>
+      ) : null}
+
+      {showAcceptForm && estimate?.status === "quoted" ? (
+        <form
+          className="panel stack"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onMarkAccepted();
+          }}
+        >
+          <h2 className="panel-title">Record acceptance</h2>
+          <p className="muted">
+            Capture how the customer accepted the quotation before moving to job
+            actuals.
+          </p>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="accepted_by_name">Accepted by</label>
+              <input
+                id="accepted_by_name"
+                value={acceptForm.accepted_by_name}
+                onChange={(event) =>
+                  setAcceptForm((current) => ({
+                    ...current,
+                    accepted_by_name: event.target.value,
+                  }))
+                }
+                placeholder="Customer or contact name"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="acceptance_method">Method</label>
+              <select
+                id="acceptance_method"
+                value={acceptForm.acceptance_method}
+                onChange={(event) =>
+                  setAcceptForm((current) => ({
+                    ...current,
+                    acceptance_method: event.target.value,
+                  }))
+                }
+              >
+                <option value="email">Email</option>
+                <option value="phone">Phone</option>
+                <option value="verbal">Verbal / on site</option>
+                <option value="portal">Portal / written form</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="acceptance_po_reference">PO / order ref</label>
+              <input
+                id="acceptance_po_reference"
+                value={acceptForm.acceptance_po_reference}
+                onChange={(event) =>
+                  setAcceptForm((current) => ({
+                    ...current,
+                    acceptance_po_reference: event.target.value,
+                  }))
+                }
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="acceptance_notes">Notes</label>
+            <input
+              id="acceptance_notes"
+              value={acceptForm.acceptance_notes}
+              onChange={(event) =>
+                setAcceptForm((current) => ({
+                  ...current,
+                  acceptance_notes: event.target.value,
+                }))
+              }
+              placeholder="Deposit agreed, start date, etc."
+            />
+          </div>
+          <div className="step-actions">
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => setShowAcceptForm(false)}
+            >
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="submit" disabled={saving}>
+              Confirm acceptance
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {estimate?.status === "accepted" && estimate.accepted_at ? (
+        <div className="info-banner">
+          Accepted
+          {estimate.accepted_by_name ? ` by ${estimate.accepted_by_name}` : ""}
+          {estimate.acceptance_method
+            ? ` via ${estimate.acceptance_method}`
+            : ""}
+          {estimate.acceptance_po_reference
+            ? ` · PO ${estimate.acceptance_po_reference}`
+            : ""}
+          .
         </div>
       ) : null}
 
@@ -859,7 +1049,7 @@ export default function EstimateEditorPage() {
                 {workTypes.find((w) => w.code === item.work_type)?.label ||
                   item.work_type}
               </h2>
-              {item.work_type === "dpc_replastering" ? (
+              {item.work_type === "injection_replaster" ? (
                 <div className="row">
                   <div className="field">
                     <label>Walls</label>
@@ -907,7 +1097,7 @@ export default function EstimateEditorPage() {
                 </div>
               ) : null}
 
-              {item.work_type === "cavity_drain" ? (
+              {item.work_type === "membrane_waterproofing" ? (
                 <>
                   <div className="row">
                     <div className="field">
@@ -992,7 +1182,7 @@ export default function EstimateEditorPage() {
                 </>
               ) : null}
 
-              {item.work_type === "sump_pump" ? (
+              {item.work_type === "pump_package" ? (
                 <>
                   <div className="field">
                     <label>Package</label>
@@ -1040,7 +1230,7 @@ export default function EstimateEditorPage() {
                 </>
               ) : null}
 
-              {item.work_type === "timber_treatment" ? (
+              {item.work_type === "timber_remediation" ? (
                 <div className="row">
                   <div className="field">
                     <label>Treatment area (m²)</label>
@@ -1092,7 +1282,7 @@ export default function EstimateEditorPage() {
                 </div>
               ) : null}
 
-              {item.work_type === "ventilation" ? (
+              {item.work_type === "ventilation_installation" ? (
                 <div className="stack">
                   {((item.measurements.items as Array<Record<string, unknown>>) || []).map(
                     (ventItem, index) => (
@@ -1421,6 +1611,9 @@ export default function EstimateEditorPage() {
               </span>
               <span>
                 {quotation.company_phone} · {quotation.company_email}
+                {quotation.company_website
+                  ? ` · ${quotation.company_website}`
+                  : ""}
               </span>
             </div>
             <p>
@@ -1560,6 +1753,11 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
+                      placeholder={
+                        estimate
+                          ? String(estimate.materials_cost || 0)
+                          : undefined
+                      }
                       value={actualsForm.materials_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1576,6 +1774,11 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
+                      placeholder={
+                        estimate
+                          ? String(estimate.labour_cost || 0)
+                          : undefined
+                      }
                       value={actualsForm.labour_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1586,12 +1789,17 @@ export default function EstimateEditorPage() {
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="waste_actual">Waste / skip (£)</label>
+                    <label htmlFor="waste_actual">Waste (£)</label>
                     <input
                       id="waste_actual"
                       type="number"
                       min={0}
                       step="0.01"
+                      placeholder={
+                        estimate
+                          ? String(estimate.waste_cost || 0)
+                          : undefined
+                      }
                       value={actualsForm.waste_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1610,6 +1818,11 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
+                      placeholder={
+                        estimate
+                          ? String(estimate.travel_cost || 0)
+                          : undefined
+                      }
                       value={actualsForm.travel_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1626,6 +1839,11 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
+                      placeholder={
+                        estimate
+                          ? String(estimate.prelim_cost || 0)
+                          : undefined
+                      }
                       value={actualsForm.prelims_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1728,13 +1946,7 @@ export default function EstimateEditorPage() {
                         <td className="money">{formatMoney(row.estimated)}</td>
                         <td className="money">{formatMoney(row.actual)}</td>
                         <td
-                          className={`money ${
-                            row.variance > 0
-                              ? "is-danger"
-                              : row.variance < 0
-                                ? "is-success"
-                                : ""
-                          }`}
+                          className={`money ${varianceTone(row.label, row.variance)}`}
                         >
                           {formatMoney(row.variance)}
                         </td>

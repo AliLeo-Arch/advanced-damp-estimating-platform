@@ -1,7 +1,7 @@
-# Advanced Damp Estimating — Mobile & Tablet UI/UX Principles
+# Trade Estimating & Quoting — Mobile & Tablet UI/UX Principles
 
 **Applies to:** Field use on phones and tablets (surveyors on site)  
-**Brand source:** [https://advanceddamp.co.uk/](https://advanceddamp.co.uk/) + `docs/UI_UX_DESIGN_SYSTEM.md`  
+**Brand source:** Local synthetic demo brand + `docs/UI_UX_DESIGN_SYSTEM.md`  
 **Product context:** Work tool first — not a marketing site on a small screen.
 
 ---
@@ -173,7 +173,7 @@ Before calling mobile “fixed”:
 |---|---|
 | `docs/UI_UX_DESIGN_SYSTEM.md` | Overall brand + desktop/app principles |
 | `docs/MOBILE_UI_UX_PRINCIPLES.md` | **This file** — phone/tablet behaviour |
-| `.cursor/rules/advanced-damp-ui.mdc` | Agent enforcement for frontend work |
+| `.cursor/rules/trade-estimating-ui.mdc` | Agent enforcement for frontend work |
 
 ---
 

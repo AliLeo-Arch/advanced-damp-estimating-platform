@@ -5,9 +5,11 @@ import {
   formatMoney,
   getPricingSettings,
   listRateCategories,
+  listRateVersions,
   PricingSettings,
   RateItem,
   RateSort,
+  RateVersion,
   searchRates,
   updatePricingSettings,
   updateRate,
@@ -15,11 +17,11 @@ import {
 import { getStoredUser } from "../auth";
 
 const WORK_TYPE_LABELS: Record<string, string> = {
-  dpc_replastering: "Chemical DPC & replastering",
-  cavity_drain: "Cavity drain membrane",
-  sump_pump: "Sump & pump",
-  timber_treatment: "Timber treatment",
-  ventilation: "Condensation & ventilation",
+  injection_replaster: "Injection Treatment & Replastering",
+  membrane_waterproofing: "Membrane Waterproofing System",
+  pump_package: "Pump / Drainage Package",
+  timber_remediation: "Timber Remedial Treatment",
+  ventilation_installation: "Ventilation Equipment",
 };
 
 const FALLBACK_CATEGORIES = [
@@ -29,10 +31,10 @@ const FALLBACK_CATEGORIES = [
   "waste_skip",
   "preliminaries",
   "sump_package",
-  "dpc_replastering",
-  "cavity_drain",
-  "timber_treatment",
-  "ventilation",
+  "injection_replaster",
+  "membrane_waterproofing",
+  "timber_remediation",
+  "ventilation_installation",
 ];
 
 const SORT_OPTIONS: Array<{ value: RateSort; label: string }> = [
@@ -74,6 +76,9 @@ export default function RatesPage() {
   const [hasPrev, setHasPrev] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [historyId, setHistoryId] = useState<number | null>(null);
+  const [historyRows, setHistoryRows] = useState<RateVersion[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -191,15 +196,43 @@ export default function RatesPage() {
         waste_percent: Number(form.get("waste_percent") || 0),
         notes: String(form.get("notes") || ""),
         active: form.get("active") === "on",
+        change_reason: String(form.get("change_reason") || "").trim() || undefined,
+        effective_date: String(form.get("effective_date") || "").trim() || undefined,
       });
       setEditingId(null);
       setMessage(`Updated ${rate.code}.`);
       await refresh();
+      if (historyId === rate.id) {
+        await loadHistory(rate.id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update rate");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function loadHistory(rateId: number) {
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const rows = await listRateVersions(rateId);
+      setHistoryRows(rows);
+      setHistoryId(rateId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load rate history");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function toggleHistory(rate: RateItem) {
+    if (historyId === rate.id) {
+      setHistoryId(null);
+      setHistoryRows([]);
+      return;
+    }
+    await loadHistory(rate.id);
   }
 
   async function toggleActive(rate: RateItem) {
@@ -239,6 +272,13 @@ export default function RatesPage() {
         ),
         survey_fee_default: Number(form.get("survey_fee_default") || 195),
         margins_by_work_type: margins,
+        company_display_name: String(form.get("company_display_name") || ""),
+        company_phone: String(form.get("company_phone") || ""),
+        company_email: String(form.get("company_email") || ""),
+        company_address: String(form.get("company_address") || ""),
+        company_website: String(form.get("company_website") || ""),
+        company_tagline: String(form.get("company_tagline") || ""),
+        quote_prefix: String(form.get("quote_prefix") || "EST"),
       });
       setSettings(updated);
       setMessage("Commercial settings saved.");
@@ -281,8 +321,9 @@ export default function RatesPage() {
       <div className="page-header">
         <h1 className="page-title">Rates &amp; commercial settings</h1>
         <p className="page-lead">
-          Maintain cost rates, target margins, and minimum job policy. Values are
-          assumed UK commercial placeholders until Advanced Damp replaces them.
+          Maintain cost rates, target margins, and minimum job policy. Seed figures
+          are synthetic demo placeholders — replace with live supplier and labour
+          rates before production use.
         </p>
       </div>
 
@@ -291,6 +332,77 @@ export default function RatesPage() {
 
       {canManageSettings && settings ? (
         <form className="panel stack" onSubmit={onSaveSettings}>
+          <h2 className="panel-title">Company profile</h2>
+          <p className="muted">
+            Used on quotations, PDF letterhead, and the application footer.
+          </p>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="company_display_name">Company name</label>
+              <input
+                id="company_display_name"
+                name="company_display_name"
+                defaultValue={settings.company_display_name || ""}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="quote_prefix">Quote prefix</label>
+              <input
+                id="quote_prefix"
+                name="quote_prefix"
+                defaultValue={settings.quote_prefix || "EST"}
+                maxLength={20}
+                required
+              />
+            </div>
+          </div>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="company_phone">Phone</label>
+              <input
+                id="company_phone"
+                name="company_phone"
+                defaultValue={settings.company_phone || ""}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="company_email">Email</label>
+              <input
+                id="company_email"
+                name="company_email"
+                type="email"
+                defaultValue={settings.company_email || ""}
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="company_address">Address</label>
+            <input
+              id="company_address"
+              name="company_address"
+              defaultValue={settings.company_address || ""}
+            />
+          </div>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="company_website">Website</label>
+              <input
+                id="company_website"
+                name="company_website"
+                defaultValue={settings.company_website || ""}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="company_tagline">Quotation tagline</label>
+              <input
+                id="company_tagline"
+                name="company_tagline"
+                defaultValue={settings.company_tagline || ""}
+              />
+            </div>
+          </div>
+
           <h2 className="panel-title">Commercial settings</h2>
           <div className="row">
             <div className="field">
@@ -404,7 +516,8 @@ export default function RatesPage() {
                 </h2>
                 <p className="muted rate-table-lead">
                   {total} rate{total === 1 ? "" : "s"} across{" "}
-                  {categoryOptions.length} categories
+                  {categoryOptions.length} categories. Cost changes are versioned
+                  with an optional reason and effective date.
                 </p>
               </div>
               <div className="rate-table-header-actions">
@@ -672,6 +785,13 @@ export default function RatesPage() {
                             <button
                               className="btn btn-secondary btn-compact"
                               type="button"
+                              onClick={() => void toggleHistory(rate)}
+                            >
+                              {historyId === rate.id ? "Hide history" : "History"}
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-compact"
+                              type="button"
                               onClick={() => void toggleActive(rate)}
                             >
                               {rate.active ? "Deactivate" : "Activate"}
@@ -749,6 +869,29 @@ export default function RatesPage() {
                                   />
                                 </div>
                               </div>
+                              <div className="row">
+                                <div className="field">
+                                  <label htmlFor={`reason-${rate.id}`}>
+                                    Change reason (if cost changes)
+                                  </label>
+                                  <input
+                                    id={`reason-${rate.id}`}
+                                    name="change_reason"
+                                    placeholder="e.g. Supplier price increase Apr 2026"
+                                  />
+                                </div>
+                                <div className="field">
+                                  <label htmlFor={`effective-${rate.id}`}>
+                                    Effective date
+                                  </label>
+                                  <input
+                                    id={`effective-${rate.id}`}
+                                    name="effective_date"
+                                    type="date"
+                                    defaultValue={rate.effective_date || ""}
+                                  />
+                                </div>
+                              </div>
                               <label className="check-line">
                                 <input
                                   type="checkbox"
@@ -774,6 +917,61 @@ export default function RatesPage() {
                                 </button>
                               </div>
                             </form>
+                          </td>
+                        </tr>
+                      ) : null}
+                      {historyId === rate.id ? (
+                        <tr className="rate-history-row">
+                          <td colSpan={8}>
+                            <div className="stack">
+                              <strong>Cost history — {rate.code}</strong>
+                              {historyLoading ? (
+                                <p className="muted">Loading history…</p>
+                              ) : historyRows.length === 0 ? (
+                                <p className="muted">
+                                  No cost versions recorded yet for this rate.
+                                </p>
+                              ) : (
+                                <div className="rate-table-wrap">
+                                  <table className="rate-table">
+                                    <thead>
+                                      <tr>
+                                        <th scope="col">When</th>
+                                        <th scope="col">Effective</th>
+                                        <th scope="col" className="is-num">
+                                          Previous
+                                        </th>
+                                        <th scope="col" className="is-num">
+                                          New
+                                        </th>
+                                        <th scope="col">Reason</th>
+                                        <th scope="col">By</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {historyRows.map((row) => (
+                                        <tr key={row.id}>
+                                          <td>
+                                            {row.created_at
+                                              ? row.created_at.slice(0, 19).replace("T", " ")
+                                              : "—"}
+                                          </td>
+                                          <td>{row.effective_date || "—"}</td>
+                                          <td className="is-num money">
+                                            {formatMoney(row.previous_cost)}
+                                          </td>
+                                          <td className="is-num money">
+                                            {formatMoney(row.new_cost)}
+                                          </td>
+                                          <td>{row.reason || "—"}</td>
+                                          <td>{row.changed_by_name || "—"}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ) : null}

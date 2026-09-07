@@ -1,4 +1,4 @@
-# Restore SQLite backup (run from repo root). Usage: .\scripts\restore.ps1 advanced_damp-20260831-120000.db
+# Restore SQLite backup (run from repo root). Usage: .\scripts\restore.ps1 trade_estimating-20260831-120000.db
 param(
     [Parameter(Mandatory = $true)]
     [string]$Filename
@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $Backend = Join-Path $Root "backend"
-$Db = Join-Path $Backend "data\advanced_damp_local_prod.db"
+$Db = Join-Path $Backend "data\trade_estimating_local_prod.db"
 $BackupDir = Join-Path $Backend "data\backups"
 $Source = Join-Path $BackupDir $Filename
 

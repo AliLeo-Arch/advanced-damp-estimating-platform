@@ -2,11 +2,11 @@
 
 **Version:** 1.0.0-local-prod  
 **Last updated:** 31 August 2026  
-**Client:** Advanced Damp Ltd
+**Product:** Trade Estimating & Quoting (generic branch)
 
 ## Summary
 
-Phases **A through G** of the local production blueprint are implemented, plus go-live tooling (rate CSV, scripts, verification) and a polish pass for search, exports, demo data, and rate-table UX. The platform is a functional estimating system on seed/assumed commercial data. It is **not** yet commercially production-ready until Advanced Damp completes the go-live gate (real rates, historical validation, sign-off).
+Phases **A through G** of the local production blueprint are implemented, plus go-live tooling (rate CSV, scripts, verification) and a polish pass for search, exports, demo data, and rate-table UX. The platform is a functional estimating system on seed/assumed commercial data. It is **not** yet commercially production-ready until the deploying contractor completes the go-live gate (real rates, historical validation, sign-off).
 
 **Handoff entry point:** `docs/CLIENT_HANDOFF.md`  
 **Recent changes:** `docs/CHANGELOG.md`
@@ -29,7 +29,7 @@ Phases **A through G** of the local production blueprint are implemented, plus g
 
 | Item | Status |
 |---|---|
-| Seeded demo estimates (`AD-DEMO-*`) | ✅ Complete |
+| Seeded demo estimates (`EST-DEMO-*`) | ✅ Complete |
 | Quotation CSV + Excel export | ✅ Complete |
 | Estimates advanced search & pagination | ✅ Complete |
 | Optimised rate table (search / sort / page) | ✅ Complete |
@@ -47,7 +47,7 @@ Phases **A through G** of the local production blueprint are implemented, plus g
 | Five work types validated on live rates | ⏳ Pending |
 | Target margins approved | ⏳ Assumed defaults in Rates UI |
 | 5–10 historical jobs within tolerance | ⏳ Template + harness ready |
-| Advanced Damp PDF/sign-off | ⏳ Pending |
+| Contractor PDF/sign-off | ⏳ Pending |
 | JWT secret + passwords changed | ⏳ Scripts + `.env.example` ready |
 | Backup restore tested on target PC | ⏳ Scripts + Admin UI ready |
 
@@ -59,15 +59,16 @@ Phases **A through G** of the local production blueprint are implemented, plus g
 .\scripts\verify-delivery.ps1
 ```
 
-**34 tests** across:
+**40 tests** across:
 
 | Suite | Focus |
 |---|---|
 | `test_pricing_engine.py` | Allocation, min job, reconciliation |
-| `test_lifecycle.py` | Status transitions, approval |
+| `test_lifecycle.py` | Status transitions, approval, revisions |
 | `test_quotation_pdf.py` | PDF generation, line reconciliation |
-| `test_actuals.py` | Variance calculation |
-| `test_backup.py` | SQLite backup/restore |
+| `test_actuals.py` | Variance calculation, CSV actuals columns |
+| `test_rate_versions.py` | Rate cost history recording |
+| `test_backup.py` | Online SQLite backup, prune, login throttle |
 | `test_benchmark_jobs.py` | DEMO-01 … DEMO-05 seed scenarios |
 | `test_rate_import.py` | CSV import/export round-trip |
 | `test_estimate_export.py` | Estimate CSV list / filenames |

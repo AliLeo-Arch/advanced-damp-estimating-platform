@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import shutil
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import HTTPException
 
 from app.config import settings
+
+DEFAULT_KEEP_BACKUPS = 30
 
 
 def db_path() -> Path:
@@ -24,14 +27,33 @@ def backup_dir() -> Path:
     return path
 
 
-def create_backup() -> dict:
+def _copy_sqlite(source: Path, target: Path) -> None:
+    """Prefer online SQLite backup API; fall back to file copy if needed."""
+    try:
+        src = sqlite3.connect(f"file:{source.as_posix()}?mode=ro", uri=True)
+        try:
+            dst = sqlite3.connect(str(target))
+            try:
+                with dst:
+                    src.backup(dst)
+            finally:
+                dst.close()
+        finally:
+            src.close()
+    except sqlite3.Error:
+        shutil.copy2(source, target)
+
+
+def create_backup(*, keep: int | None = DEFAULT_KEEP_BACKUPS) -> dict:
     source = db_path()
     if not source.exists():
         raise HTTPException(status_code=404, detail="Database file not found")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    filename = f"advanced_damp-{stamp}.db"
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    filename = f"trade_estimating-{stamp}.db"
     target = backup_dir() / filename
-    shutil.copy2(source, target)
+    _copy_sqlite(source, target)
+    if keep is not None:
+        prune_backups(keep=keep)
     stat = target.stat()
     return {
         "filename": filename,
@@ -41,9 +63,25 @@ def create_backup() -> dict:
     }
 
 
+def prune_backups(*, keep: int = DEFAULT_KEEP_BACKUPS) -> int:
+    """Delete oldest trade_estimating-*.db files beyond keep count. Returns deleted count."""
+    if keep < 1:
+        return 0
+    files = sorted(
+        backup_dir().glob("trade_estimating-*.db"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    deleted = 0
+    for file in files[keep:]:
+        file.unlink(missing_ok=True)
+        deleted += 1
+    return deleted
+
+
 def list_backups() -> list[dict]:
     rows = []
-    for file in sorted(backup_dir().glob("advanced_damp-*.db"), reverse=True):
+    for file in sorted(backup_dir().glob("trade_estimating-*.db"), reverse=True):
         stat = file.stat()
         rows.append(
             {
@@ -75,9 +113,9 @@ def restore_backup(filename: str) -> dict:
         pre_restore = backup_dir() / (
             f"pre-restore-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.db"
         )
-        shutil.copy2(target, pre_restore)
+        _copy_sqlite(target, pre_restore)
         pre_restore_name = pre_restore.name
-    shutil.copy2(source, target)
+    _copy_sqlite(source, target)
     return {
         "restored_from": filename,
         "database": str(target),

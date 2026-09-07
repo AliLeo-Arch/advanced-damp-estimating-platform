@@ -21,11 +21,11 @@ def _rate(code: str, cost: float, category: str = "materials", **extra):
 
 
 SAMPLE_RATES = [
-    _rate("MAT-DPC-CREAM", 12.0),
-    _rate("MAT-DPC-PLUGS", 0.15),
+    _rate("MAT-INJ-CREAM", 12.0),
+    _rate("MAT-INJ-PLUGS", 0.15),
     _rate("MAT-RENOV-PLASTER", 18.0),
     _rate("MAT-SBR-PRIMER", 8.0),
-    _rate("LAB-DPC-LM", 22.0, "labour"),
+    _rate("LAB-INJ-LM", 22.0, "labour"),
     _rate("LAB-REPLASTER-M2", 28.0, "labour"),
     _rate("MAT-CDM-WALL-8", 14.0),
     _rate("MAT-CDM-FLOOR-20", 16.0),
@@ -45,7 +45,7 @@ def test_line_sells_reconcile_to_job_sell():
     result = calculate_estimate(
         work_items=[
             {
-                "work_type": "dpc_replastering",
+                "work_type": "injection_replaster",
                 "measurements": {
                     "walls": 1,
                     "wall_length_lm": 12,
@@ -53,7 +53,7 @@ def test_line_sells_reconcile_to_job_sell():
                 },
             },
             {
-                "work_type": "cavity_drain",
+                "work_type": "membrane_waterproofing",
                 "measurements": {
                     "wall_area_m2": 20,
                     "floor_area_m2": 10,
@@ -64,7 +64,7 @@ def test_line_sells_reconcile_to_job_sell():
             },
         ],
         rates=SAMPLE_RATES,
-        margins_by_type={"dpc_replastering": 35.0, "cavity_drain": 32.0},
+        margins_by_type={"injection_replaster": 35.0, "membrane_waterproofing": 32.0},
         travel_band_code="TRV-LOCAL",
         waste_code="WS-ALLOW-SMALL",
         prelim_codes=["PRE-STD"],
@@ -80,7 +80,7 @@ def test_minimum_job_still_reconciles():
     result = calculate_estimate(
         work_items=[
             {
-                "work_type": "dpc_replastering",
+                "work_type": "injection_replaster",
                 "measurements": {
                     "walls": 1,
                     "wall_length_lm": 1,
@@ -89,7 +89,7 @@ def test_minimum_job_still_reconciles():
             }
         ],
         rates=SAMPLE_RATES,
-        margins_by_type={"dpc_replastering": 35.0},
+        margins_by_type={"injection_replaster": 35.0},
         travel_band_code="TRV-LOCAL",
         waste_code="WS-ALLOW-SMALL",
         prelim_codes=["PRE-STD"],
@@ -104,7 +104,7 @@ def test_override_sell_reconciles():
     result = calculate_estimate(
         work_items=[
             {
-                "work_type": "dpc_replastering",
+                "work_type": "injection_replaster",
                 "measurements": {
                     "walls": 1,
                     "wall_length_lm": 12,
@@ -112,7 +112,7 @@ def test_override_sell_reconciles():
                 },
             },
             {
-                "work_type": "cavity_drain",
+                "work_type": "membrane_waterproofing",
                 "measurements": {
                     "wall_area_m2": 20,
                     "floor_area_m2": 10,
@@ -122,7 +122,7 @@ def test_override_sell_reconciles():
             },
         ],
         rates=SAMPLE_RATES,
-        margins_by_type={"dpc_replastering": 35.0, "cavity_drain": 32.0},
+        margins_by_type={"injection_replaster": 35.0, "membrane_waterproofing": 32.0},
         travel_band_code="TRV-LOCAL",
         waste_code="WS-ALLOW-SMALL",
         prelim_codes=["PRE-STD"],
@@ -158,9 +158,9 @@ def test_reconcile_helper_penny_perfect():
 
 def test_validation_warnings_for_empty_ventilation():
     result = calculate_estimate(
-        work_items=[{"work_type": "ventilation", "measurements": {"items": []}}],
+        work_items=[{"work_type": "ventilation_installation", "measurements": {"items": []}}],
         rates=SAMPLE_RATES,
-        margins_by_type={"ventilation": 34.0},
+        margins_by_type={"ventilation_installation": 34.0},
         travel_band_code="TRV-LOCAL",
         waste_code="WS-ALLOW-SMALL",
         prelim_codes=[],

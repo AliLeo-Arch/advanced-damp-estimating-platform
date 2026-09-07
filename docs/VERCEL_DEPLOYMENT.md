@@ -2,7 +2,7 @@
 
 This project can run as **two Vercel projects** (frontend + backend API).
 
-> **Important:** SQLite on Vercel uses `/tmp` and is **ephemeral** (data can reset between cold starts). Fine for demos; for lasting production data use Postgres (`DATABASE_URL`).
+> **Important:** SQLite on Vercel uses `/tmp` and is **ephemeral** (data can reset between cold starts). Use Vercel for demos only. Office production stays on **local SQLite** (`trade_estimating_local_prod.db`).
 
 ---
 
@@ -16,11 +16,11 @@ This project can run as **two Vercel projects** (frontend + backend API).
 | Name | Value |
 |---|---|
 | `JWT_SECRET` | Long random secret (required) |
-| `CORS_ORIGINS` | Your frontend URL, e.g. `https://advanced-damp-estimating-platform.vercel.app` |
+| `CORS_ORIGINS` | Your frontend URL, e.g. `https://trade-estimating-quoting-platform.vercel.app` |
 | `CORS_ALLOW_VERCEL_PREVIEWS` | `true` (optional; allows `*.vercel.app`) |
-| `DATABASE_URL` | Optional. Default on Vercel: `sqlite:////tmp/advanced_damp_prod.db` |
+| `DATABASE_URL` | Optional. Default on Vercel: `sqlite:////tmp/trade_estimating_prod.db` |
 
-5. Deploy. Note the backend URL, e.g. `https://advanced-damp-api.vercel.app`.
+5. Deploy. Note the backend URL, e.g. `https://trade-estimating-api.vercel.app`.
 6. Smoke-test: open `https://YOUR-BACKEND.vercel.app/health` — should return JSON with `"status":"ok"`.
 
 ---
@@ -47,7 +47,7 @@ Backend `CORS_ORIGINS` must include the exact frontend origin (scheme + host, no
 Example:
 
 ```
-CORS_ORIGINS=https://advanced-damp-estimating-platform.vercel.app,http://localhost:5173
+CORS_ORIGINS=https://trade-estimating-quoting-platform.vercel.app,http://localhost:5173
 ```
 
 ---
@@ -67,8 +67,8 @@ Typical causes before this fix:
 
 | Role | Email | Password |
 |---|---|---|
-| Surveyor | james.whitaker@advanceddamp.co.uk | Surveyor1! |
-| Owner | owner@advanceddamp.co.uk | OwnerDamp1! |
+| Surveyor | james.whitaker@northbridge-demo.example | Surveyor1! |
+| Owner | owner@northbridge-demo.example | DemoOwner1! |
 
 Change passwords and `JWT_SECRET` before real use.
 

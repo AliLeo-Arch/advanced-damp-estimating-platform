@@ -1,17 +1,17 @@
 {
   "meta": {
-    "title": "Advanced Damp Ltd — POC Sample Commercial Data",
+    "title": "Northbridge Property Services Ltd \u2014 Sample Commercial Data",
     "currency": "GBP",
-    "vat_rate": 0.20,
+    "vat_rate": 0.2,
     "office_base": {
-      "name": "Advanced Damp Ltd — Head Office",
-      "address": "Unit 4, Riverside Industrial Estate, Croydon",
-      "postcode": "CR0 4XB",
-      "phone": "020 7946 0182",
-      "email": "estimates@advanceddamp.example",
-      "website": "www.advanceddamp.example"
+      "name": "Northbridge Property Services Ltd \u2014 Head Office",
+      "address": "12 Station Approach, Reading",
+      "postcode": "RG1 1LG",
+      "phone": "0118 496 0123",
+      "email": "estimates@northbridge-demo.example",
+      "website": "www.northbridge-demo.example"
     },
-    "disclaimer": "Illustrative POC rates for testing only. Replace with Advanced Damp's live supplier costs, labour productivity and commercial targets during discovery. Not for live customer quotations."
+    "disclaimer": "Illustrative demonstration rates for testing only. Replace with live supplier costs, labour productivity and commercial targets during discovery. Not for live customer quotations."
   },
   "pricing_rules": {
     "minimum_job_value": 750.0,
@@ -19,28 +19,28 @@
     "default_payment_terms": "50% deposit on acceptance; balance due on completion.",
     "margins_by_work_type": [
       {
-        "work_type": "dpc_replastering",
-        "label": "Chemical DPC Injection & Replastering",
+        "work_type": "injection_replaster",
+        "label": "Injection Treatment & Replastering",
         "target_margin_percent": 35.0
       },
       {
-        "work_type": "cavity_drain",
-        "label": "Cavity Drain Membrane Systems",
+        "work_type": "membrane_waterproofing",
+        "label": "Membrane Waterproofing System",
         "target_margin_percent": 32.0
       },
       {
-        "work_type": "sump_pump",
-        "label": "Sump & Pump Installations",
+        "work_type": "pump_package",
+        "label": "Pump / Drainage Package",
         "target_margin_percent": 30.0
       },
       {
-        "work_type": "timber_treatment",
-        "label": "Timber Treatment",
+        "work_type": "timber_remediation",
+        "label": "Timber Remedial Treatment",
         "target_margin_percent": 33.0
       },
       {
-        "work_type": "ventilation",
-        "label": "Condensation & Ventilation",
+        "work_type": "ventilation_installation",
+        "label": "Ventilation Equipment",
         "target_margin_percent": 28.0
       }
     ]
@@ -48,7 +48,7 @@
   "labour_rates": [
     {
       "code": "LAB-DAY-TECH",
-      "name": "Damp technician — day rate",
+      "name": "Site technician — day rate",
       "unit": "day",
       "cost_per_unit": 280.0,
       "notes": "Fully inclusive site operative day rate (ex. materials)."
@@ -58,11 +58,11 @@
       "name": "Lead surveyor / senior tech — day rate",
       "unit": "day",
       "cost_per_unit": 340.0,
-      "notes": "Used for complex basement / multi-trade packages."
+      "notes": "Used for complex multi-trade packages."
     },
     {
-      "code": "LAB-DPC-LM",
-      "name": "DPC injection labour",
+      "code": "LAB-INJ-LM",
+      "name": "Injection treatment labour",
       "unit": "lm",
       "cost_per_unit": 18.0,
       "notes": "Output rate per linear metre of wall treated."
@@ -76,7 +76,7 @@
     },
     {
       "code": "LAB-MEMBRANE-M2",
-      "name": "Cavity drain membrane labour",
+      "name": "Membrane waterproofing labour",
       "unit": "m2",
       "cost_per_unit": 28.0,
       "notes": "Wall or floor membrane fixing labour."
@@ -90,7 +90,7 @@
     },
     {
       "code": "LAB-TIMBER-M2",
-      "name": "Timber treatment labour",
+      "name": "Timber remedial treatment labour",
       "unit": "m2",
       "cost_per_unit": 16.0,
       "notes": "Spray / brush application to accessible timber."
@@ -119,20 +119,20 @@
   ],
   "materials": [
     {
-      "code": "MAT-DPC-CREAM",
-      "name": "DPC injection cream (BBA-type)",
-      "category": "dpc_replastering",
+      "code": "MAT-INJ-CREAM",
+      "name": "Injection cream (BBA-type)",
+      "category": "injection_replaster",
       "unit": "litre",
-      "cost_per_unit": 28.50,
+      "cost_per_unit": 28.5,
       "waste_percent": 8.0,
       "consumption_note": "Approx. 0.3 L per lm for 225 mm solid wall (POC assumption).",
-      "supplier_ref": "SAMPLE-DPC-01",
+      "supplier_ref": "SAMPLE-INJ-01",
       "active": true
     },
     {
-      "code": "MAT-DPC-PLUGS",
+      "code": "MAT-INJ-PLUGS",
       "name": "Injection hole plugs",
-      "category": "dpc_replastering",
+      "category": "injection_replaster",
       "unit": "each",
       "cost_per_unit": 0.35,
       "waste_percent": 5.0,
@@ -143,31 +143,31 @@
     {
       "code": "MAT-RENOV-PLASTER",
       "name": "Renovating plaster",
-      "category": "dpc_replastering",
+      "category": "injection_replaster",
       "unit": "bag_25kg",
       "cost_per_unit": 18.75,
       "waste_percent": 10.0,
-      "consumption_note": "Approx. 1 bag per 2.5 m² at 12 mm.",
+      "consumption_note": "Approx. 1 bag per 2.5 m\u00b2 at 12 mm.",
       "supplier_ref": "SAMPLE-RP-25",
       "active": true
     },
     {
       "code": "MAT-SBR-PRIMER",
       "name": "SBR bonding primer",
-      "category": "dpc_replastering",
+      "category": "injection_replaster",
       "unit": "litre",
-      "cost_per_unit": 6.40,
+      "cost_per_unit": 6.4,
       "waste_percent": 5.0,
-      "consumption_note": "Approx. 0.2 L per m².",
+      "consumption_note": "Approx. 0.2 L per m\u00b2.",
       "supplier_ref": "SAMPLE-SBR-01",
       "active": true
     },
     {
       "code": "MAT-CDM-WALL-8",
-      "name": "Cavity drain membrane — wall 8 mm",
-      "category": "cavity_drain",
+      "name": "Membrane waterproofing \u2014 wall 8 mm",
+      "category": "membrane_waterproofing",
       "unit": "m2",
-      "cost_per_unit": 14.80,
+      "cost_per_unit": 14.8,
       "waste_percent": 10.0,
       "consumption_note": "Allow 10% for overlaps and detailing.",
       "supplier_ref": "SAMPLE-CDM-W8",
@@ -175,10 +175,10 @@
     },
     {
       "code": "MAT-CDM-FLOOR-20",
-      "name": "Cavity drain membrane — floor 20 mm",
-      "category": "cavity_drain",
+      "name": "Membrane waterproofing \u2014 floor 20 mm",
+      "category": "membrane_waterproofing",
       "unit": "m2",
-      "cost_per_unit": 18.20,
+      "cost_per_unit": 18.2,
       "waste_percent": 10.0,
       "consumption_note": "Allow 10% for overlaps.",
       "supplier_ref": "SAMPLE-CDM-F20",
@@ -187,42 +187,42 @@
     {
       "code": "MAT-CDM-FIXINGS",
       "name": "Membrane brick plugs / seals",
-      "category": "cavity_drain",
+      "category": "membrane_waterproofing",
       "unit": "each",
       "cost_per_unit": 0.55,
       "waste_percent": 5.0,
-      "consumption_note": "Approx. 11 fixings per m² wall membrane.",
+      "consumption_note": "Approx. 11 fixings per m\u00b2 wall membrane.",
       "supplier_ref": "SAMPLE-FIX-11",
       "active": true
     },
     {
       "code": "MAT-BATTEN-25",
-      "name": "Treated softwood batten 25×38 mm",
-      "category": "cavity_drain",
+      "name": "Treated softwood batten 25\u00d738 mm",
+      "category": "membrane_waterproofing",
       "unit": "lm",
       "cost_per_unit": 1.85,
       "waste_percent": 8.0,
-      "consumption_note": "Approx. 2.5 lm battens per m² boarded wall.",
+      "consumption_note": "Approx. 2.5 lm battens per m\u00b2 boarded wall.",
       "supplier_ref": "SAMPLE-BAT-25",
       "active": true
     },
     {
       "code": "MAT-BOARD-12.5",
       "name": "Moisture-resistant plasterboard 12.5 mm",
-      "category": "cavity_drain",
+      "category": "membrane_waterproofing",
       "unit": "m2",
-      "cost_per_unit": 8.90,
+      "cost_per_unit": 8.9,
       "waste_percent": 10.0,
-      "consumption_note": "Board area ≈ wall membrane area.",
+      "consumption_note": "Board area \u2248 wall membrane area.",
       "supplier_ref": "SAMPLE-PB-MR",
       "active": true
     },
     {
       "code": "MAT-DRAIN-CHANNEL",
       "name": "Perimeter drainage channel",
-      "category": "cavity_drain",
+      "category": "membrane_waterproofing",
       "unit": "lm",
-      "cost_per_unit": 22.50,
+      "cost_per_unit": 22.5,
       "waste_percent": 5.0,
       "consumption_note": "Where floor/wall junction drainage is specified.",
       "supplier_ref": "SAMPLE-CH-01",
@@ -231,20 +231,20 @@
     {
       "code": "MAT-TIMBER-FLUID",
       "name": "Timber preservative / fungicide",
-      "category": "timber_treatment",
+      "category": "timber_remediation",
       "unit": "litre",
-      "cost_per_unit": 9.80,
+      "cost_per_unit": 9.8,
       "waste_percent": 8.0,
-      "consumption_note": "Approx. 0.25 L per m² treated surface.",
+      "consumption_note": "Approx. 0.25 L per m\u00b2 treated surface.",
       "supplier_ref": "SAMPLE-TF-01",
       "active": true
     },
     {
       "code": "MAT-JOIST-C24",
       "name": "Replacement joist timber C24",
-      "category": "timber_treatment",
+      "category": "timber_remediation",
       "unit": "lm",
-      "cost_per_unit": 12.40,
+      "cost_per_unit": 12.4,
       "waste_percent": 5.0,
       "consumption_note": "Per linear metre of replacement joist.",
       "supplier_ref": "SAMPLE-C24",
@@ -253,9 +253,9 @@
     {
       "code": "MAT-FLOORBOARD",
       "name": "Softwood floorboarding",
-      "category": "timber_treatment",
+      "category": "timber_remediation",
       "unit": "m2",
-      "cost_per_unit": 24.00,
+      "cost_per_unit": 24.0,
       "waste_percent": 10.0,
       "consumption_note": "Where floor boards are renewed.",
       "supplier_ref": "SAMPLE-FB-01",
@@ -264,9 +264,9 @@
     {
       "code": "MAT-EXTRACTOR-100",
       "name": "Extractor fan 100 mm (bathroom)",
-      "category": "ventilation",
+      "category": "ventilation_installation",
       "unit": "each",
-      "cost_per_unit": 68.00,
+      "cost_per_unit": 68.0,
       "waste_percent": 0.0,
       "consumption_note": "Supply only; labour separate.",
       "supplier_ref": "SAMPLE-XF-100",
@@ -275,9 +275,9 @@
     {
       "code": "MAT-PIV-UNIT",
       "name": "Positive Input Ventilation (PIV) unit",
-      "category": "ventilation",
+      "category": "ventilation_installation",
       "unit": "each",
-      "cost_per_unit": 420.00,
+      "cost_per_unit": 420.0,
       "waste_percent": 0.0,
       "consumption_note": "Loft-mounted PIV supply package.",
       "supplier_ref": "SAMPLE-PIV-01",
@@ -286,9 +286,9 @@
     {
       "code": "MAT-VENT-DUCT",
       "name": "Flexible ducting & grille pack",
-      "category": "ventilation",
+      "category": "ventilation_installation",
       "unit": "each",
-      "cost_per_unit": 28.00,
+      "cost_per_unit": 28.0,
       "waste_percent": 0.0,
       "consumption_note": "Per ventilation install.",
       "supplier_ref": "SAMPLE-VD-01",
@@ -366,7 +366,7 @@
     },
     {
       "code": "WS-SKIP-BUILDERS",
-      "name": "Builder's skip (6–8 yard)",
+      "name": "Builder's skip (6\u20138 yard)",
       "unit": "each",
       "cost_per_unit": 310.0,
       "notes": "Larger strip-out and boarding waste."
@@ -432,7 +432,7 @@
       "code": "PRE-ULEZ",
       "name": "ULEZ / congestion allowance",
       "unit": "day",
-      "cost_per_unit": 12.50,
+      "cost_per_unit": 12.5,
       "notes": "Greater London charging zones."
     },
     {
@@ -462,99 +462,102 @@
       "id": "SUR-01",
       "name": "James Whitaker",
       "role": "Senior Surveyor",
-      "base": "Croydon"
+      "base": "Reading"
     },
     {
       "id": "SUR-02",
       "name": "Sarah Okonkwo",
       "role": "Surveyor",
-      "base": "Croydon"
+      "base": "Reading"
     },
     {
       "id": "SUR-03",
       "name": "Tom Bradley",
       "role": "Surveyor",
-      "base": "Maidstone coverage"
+      "base": "Newbury coverage"
     }
   ],
   "customers_and_sites": [
     {
-      "customer_name": "Mrs Helen Carter",
+      "customer_name": "Ms Emma Thompson",
       "company_name": null,
-      "email": "helen.carter@example.com",
+      "email": "emma.thompson@example.com",
       "telephone": "07700 900121",
-      "site_address": "18 Maple Avenue, Bromley",
-      "postcode": "BR1 2NP",
+      "site_address": "24 Cedar Road, Reading",
+      "postcode": "RG1 4AB",
       "travel_band": "TRV-LOCAL",
-      "notes": "Victorian terrace. Rising damp to front reception wall."
+      "notes": "Victorian terrace. Rising damp to front reception wall. Synthetic demo only."
     },
     {
-      "customer_name": "Mr David Patel",
+      "customer_name": "Mr Oliver Grant",
       "company_name": null,
-      "email": "david.patel@example.com",
+      "email": "oliver.grant@example.com",
       "telephone": "07700 900234",
-      "site_address": "7 Church Lane, Sevenoaks",
-      "postcode": "TN13 1XA",
-      "travel_band": "TRV-B1",
-      "notes": "Basement conversion — cavity drain interest."
-    },
-    {
-      "customer_name": "Greenfield Lettings Ltd",
-      "company_name": "Greenfield Lettings Ltd",
-      "email": "maintenance@greenfieldlettings.example",
-      "telephone": "020 7946 1120",
-      "site_address": "42A Kingsland Road, Hackney",
-      "postcode": "E8 4AA",
-      "travel_band": "TRV-B1",
-      "notes": "Portfolio flat. Condensation and mould complaints."
-    },
-    {
-      "customer_name": "Ms Amira Hassan",
-      "company_name": null,
-      "email": "amira.hassan@example.com",
-      "telephone": "07700 900456",
-      "site_address": "9 The Crescent, Tunbridge Wells",
-      "postcode": "TN1 2LU",
-      "travel_band": "TRV-B2",
-      "notes": "Suspended timber floor — suspected wet rot to joist ends."
-    },
-    {
-      "customer_name": "Oak & Stone Developments",
-      "company_name": "Oak & Stone Developments Ltd",
-      "email": "projects@oakandstone.example",
-      "telephone": "020 7946 3344",
-      "site_address": "Unit B, Wharf Road, Greenwich",
-      "postcode": "SE10 9RB",
+      "site_address": "Flat 2, 15 Queens Road, Reading",
+      "postcode": "RG1 4AY",
       "travel_band": "TRV-LOCAL",
-      "notes": "New basement waterproofing package with twin pump."
+      "notes": "Small localised treatment \u2014 minimum job floor test. Synthetic demo only."
+    },
+    {
+      "customer_name": "Cedar Property Management Ltd",
+      "company_name": "Cedar Property Management Ltd",
+      "email": "maintenance@cedar-pm.example",
+      "telephone": "0118 496 0456",
+      "site_address": "Flat 4, 8 Market Place, Reading",
+      "postcode": "RG1 2DE",
+      "travel_band": "TRV-B1",
+      "notes": "Portfolio flat. Condensation and mould complaints. Synthetic demo only."
+    },
+    {
+      "customer_name": "Ms Priya Shah",
+      "company_name": null,
+      "email": "priya.shah@example.com",
+      "telephone": "07700 900456",
+      "site_address": "11 Orchard Close, Newbury",
+      "postcode": "RG14 2AB",
+      "travel_band": "TRV-B2",
+      "notes": "Suspended timber floor \u2014 suspected wet rot to joist ends. Synthetic demo only."
+    },
+    {
+      "customer_name": "Riverside Build Co Ltd",
+      "company_name": "Riverside Build Co Ltd",
+      "email": "projects@riverside-build.example",
+      "telephone": "0118 496 0789",
+      "site_address": "Unit 3, Canal Wharf, Reading",
+      "postcode": "RG1 8DJ",
+      "travel_band": "TRV-LOCAL",
+      "notes": "Basement waterproofing package with twin pump. Synthetic demo only."
     }
   ],
   "demo_scenarios": [
     {
       "id": "DEMO-01",
-      "title": "POC showcase — rising damp + ventilation (Bromley)",
-      "customer_name": "Mrs Helen Carter",
-      "site_address": "18 Maple Avenue, Bromley",
-      "postcode": "BR1 2NP",
+      "title": "Demo showcase \u2014 rising damp + ventilation (Reading)",
+      "customer_name": "Ms Emma Thompson",
+      "site_address": "24 Cedar Road, Reading",
+      "postcode": "RG1 4AB",
       "surveyor": "James Whitaker",
       "survey_date": "2026-08-28",
       "travel_band": "TRV-LOCAL",
       "waste": "WS-ALLOW-SMALL",
-      "preliminaries": ["PRE-STD", "PRE-ULEZ"],
+      "preliminaries": [
+        "PRE-STD",
+        "PRE-ULEZ"
+      ],
       "work_items": [
         {
-          "work_type": "dpc_replastering",
+          "work_type": "injection_replaster",
           "walls": 1,
           "wall_length_lm": 12.0,
           "replaster_height_m": 1.2,
-          "spec": "Chemical DPC + renovating plaster to 1.2 m",
+          "spec": "Injection treatment + renovating plaster to 1.2 m",
           "derived": {
             "dpc_lm": 12.0,
             "replaster_m2": 14.4
           }
         },
         {
-          "work_type": "ventilation",
+          "work_type": "ventilation_installation",
           "items": [
             {
               "code": "MAT-EXTRACTOR-100",
@@ -565,26 +568,31 @@
         }
       ],
       "expected_behaviour": [
-        "Calculate material + labour + waste + local travel (£0) + prelims",
+        "Calculate material + labour + waste + local travel (\u00a30) + prelims",
         "Apply 35% target margin on DPC portion / 28% on ventilation (or blended per engine rules)",
-        "Enforce £750 minimum job value if calculated sell is lower",
+        "Enforce \u00a3750 minimum job value if calculated sell is lower",
         "Override sell price downward and show live margin drop"
       ]
     },
     {
       "id": "DEMO-02",
-      "title": "Basement cavity drain + twin sump (Greenwich)",
-      "customer_name": "Oak & Stone Developments",
-      "site_address": "Unit B, Wharf Road, Greenwich",
-      "postcode": "SE10 9RB",
+      "title": "Basement cavity drain + twin sump (Reading wharf)",
+      "customer_name": "Riverside Build Co Ltd",
+      "site_address": "Unit 3, Canal Wharf, Reading",
+      "postcode": "RG1 8DJ",
       "surveyor": "Sarah Okonkwo",
       "survey_date": "2026-08-29",
       "travel_band": "TRV-LOCAL",
       "waste": "WS-SKIP-BUILDERS",
-      "preliminaries": ["PRE-STD", "PRE-PARKING", "PRE-ULEZ", "PRE-PROTECTION"],
+      "preliminaries": [
+        "PRE-STD",
+        "PRE-PARKING",
+        "PRE-ULEZ",
+        "PRE-PROTECTION"
+      ],
       "work_items": [
         {
-          "work_type": "cavity_drain",
+          "work_type": "membrane_waterproofing",
           "wall_area_m2": 48.0,
           "floor_area_m2": 22.0,
           "membrane_wall_spec": "MAT-CDM-WALL-8",
@@ -594,9 +602,12 @@
           "drainage_channel_lm": 18.0
         },
         {
-          "work_type": "sump_pump",
+          "work_type": "pump_package",
           "package": "PKG-SUMP-TWIN",
-          "addons": ["PKG-SUMP-BATTERY", "PKG-SUMP-ALARM-PRO"]
+          "addons": [
+            "PKG-SUMP-BATTERY",
+            "PKG-SUMP-ALARM-PRO"
+          ]
         }
       ],
       "expected_behaviour": [
@@ -607,18 +618,21 @@
     },
     {
       "id": "DEMO-03",
-      "title": "Timber treatment — Tunbridge Wells",
-      "customer_name": "Ms Amira Hassan",
-      "site_address": "9 The Crescent, Tunbridge Wells",
-      "postcode": "TN1 2LU",
+      "title": "Timber remedial treatment \u2014 Newbury",
+      "customer_name": "Ms Priya Shah",
+      "site_address": "11 Orchard Close, Newbury",
+      "postcode": "RG14 2AB",
       "surveyor": "Tom Bradley",
       "survey_date": "2026-08-30",
       "travel_band": "TRV-B2",
       "waste": "WS-SKIP-MIDI",
-      "preliminaries": ["PRE-STD", "PRE-ACCESS"],
+      "preliminaries": [
+        "PRE-STD",
+        "PRE-ACCESS"
+      ],
       "work_items": [
         {
-          "work_type": "timber_treatment",
+          "work_type": "timber_remediation",
           "treatment_area_m2": 28.0,
           "joist_repairs": 4,
           "floor_renewal_m2": 6.0,
@@ -626,25 +640,29 @@
         }
       ],
       "expected_behaviour": [
-        "Apply Band 2 travel (£120)",
+        "Apply Band 2 travel (\u00a3120)",
         "33% timber target margin",
         "Show restricted-access prelim clearly on internal summary"
       ]
     },
     {
       "id": "DEMO-04",
-      "title": "Condensation control — Hackney letting",
-      "customer_name": "Greenfield Lettings Ltd",
-      "site_address": "42A Kingsland Road, Hackney",
-      "postcode": "E8 4AA",
+      "title": "Condensation control \u2014 Reading letting",
+      "customer_name": "Cedar Property Management Ltd",
+      "site_address": "Flat 4, 8 Market Place, Reading",
+      "postcode": "RG1 2DE",
       "surveyor": "Sarah Okonkwo",
       "survey_date": "2026-08-27",
       "travel_band": "TRV-B1",
       "waste": "WS-ALLOW-SMALL",
-      "preliminaries": ["PRE-STD", "PRE-ULEZ", "PRE-PARKING"],
+      "preliminaries": [
+        "PRE-STD",
+        "PRE-ULEZ",
+        "PRE-PARKING"
+      ],
       "work_items": [
         {
-          "work_type": "ventilation",
+          "work_type": "ventilation_installation",
           "items": [
             {
               "code": "MAT-PIV-UNIT",
@@ -667,18 +685,20 @@
     },
     {
       "id": "DEMO-05",
-      "title": "Minimum job value floor test — small DPC",
-      "customer_name": "Mr David Patel",
-      "site_address": "Flat 2, 3 Station Approach, Orpington",
-      "postcode": "BR6 0RZ",
+      "title": "Minimum job value floor test \u2014 small DPC",
+      "customer_name": "Mr Oliver Grant",
+      "site_address": "Flat 2, 15 Queens Road, Reading",
+      "postcode": "RG1 4AY",
       "surveyor": "James Whitaker",
       "survey_date": "2026-08-26",
       "travel_band": "TRV-LOCAL",
       "waste": "WS-ALLOW-SMALL",
-      "preliminaries": ["PRE-STD"],
+      "preliminaries": [
+        "PRE-STD"
+      ],
       "work_items": [
         {
-          "work_type": "dpc_replastering",
+          "work_type": "injection_replaster",
           "walls": 1,
           "wall_length_lm": 2.5,
           "replaster_height_m": 1.0,
@@ -686,7 +706,7 @@
         }
       ],
       "expected_behaviour": [
-        "Calculated sell may fall below £750",
+        "Calculated sell may fall below \u00a3750",
         "Engine must lift final sell price to minimum job value",
         "Internal summary shows min-job adjustment and resulting margin %"
       ]
@@ -706,6 +726,9 @@
       "Out-of-hours working"
     ],
     "vat_note": "All prices exclusive of VAT unless otherwise stated. VAT charged at the prevailing UK rate (sample 20%).",
-    "validity_note": "This quotation is valid for 30 days from the date of issue."
+    "validity_note": "This quotation is valid for 30 days from the date of issue.",
+    "guarantee": "Where applicable, works are offered with the contractor's standard guarantee subject to correct use, maintenance, and payment in full. Guarantee certificates are issued on completion as appropriate to the treatment.",
+    "survey_fee_credit": "Where a survey fee has been paid and the customer proceeds with the quoted works, the survey fee may be credited against the works invoice in line with company policy.",
+    "acceptance": "To accept this quotation, please confirm in writing (email is acceptable) quoting the quotation reference. A deposit may be required before works are scheduled."
   }
 }

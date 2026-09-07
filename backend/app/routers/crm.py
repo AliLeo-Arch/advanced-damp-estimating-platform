@@ -55,7 +55,7 @@ class SiteRead(BaseModel):
 
 
 class SurveyCreate(BaseModel):
-    survey_type: str = "damp_survey"
+    survey_type: str = "site_survey"
     survey_date: str = ""
     surveyor_name: str = ""
     diagnosis_summary: str = ""

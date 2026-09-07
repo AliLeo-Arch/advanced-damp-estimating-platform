@@ -1,7 +1,7 @@
-# Client Handoff — Advanced Damp Estimating Platform
+# Client Handoff — Trade Estimating & Quoting Platform
 
 **Version:** 1.0.0-local-prod  
-**Prepared for:** Advanced Damp Ltd  
+**Prepared for:** Deploying contractor (synthetic demo: Northbridge Property Services Ltd)  
 **Deployment model:** Local production (office PC / LAN)
 
 ---
@@ -21,7 +21,7 @@ A working **local estimating and quoting platform** that covers:
 - Rate and commercial settings administration
 - Database backup/restore and operational logging
 
-Built on **seed/assumed commercial rates** until Advanced Damp supplies live price lists. The software is functionally complete; **commercial go-live** requires your rates, historical validation, and sign-off.
+Built on **seed/assumed commercial rates** until the deploying contractor supplies live price lists. The software is functionally complete; **commercial go-live** requires your rates, historical validation, and sign-off.
 
 ---
 
@@ -81,10 +81,10 @@ API documentation: **http://127.0.0.1:8000/docs**
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | admin@advanceddamp.co.uk | AdvancedDamp1! |
-| Owner | owner@advanceddamp.co.uk | OwnerDamp1! |
-| Surveyor | james.whitaker@advanceddamp.co.uk | Surveyor1! |
-| Office | office@advanceddamp.co.uk | OfficeDamp1! |
+| Admin | admin@northbridge-demo.example | DemoAdmin1! |
+| Owner | owner@northbridge-demo.example | DemoOwner1! |
+| Surveyor | james.whitaker@northbridge-demo.example | Surveyor1! |
+| Office | office@northbridge-demo.example | DemoOffice1! |
 
 **Action required:** Change every password and set `JWT_SECRET` in `backend/.env` before staff use.
 
@@ -94,7 +94,7 @@ API documentation: **http://127.0.0.1:8000/docs**
 
 1. **Customers** — add customer → site → survey  
 2. **New estimate** — from survey (prefilled) or Estimates → New  
-   - Or open a seeded demo such as **AD-DEMO-01** for a quick walkthrough  
+   - Or open a seeded demo such as **EST-DEMO-01** for a quick walkthrough  
 3. **Work scope** → **Measurements** → **Price review**  
 4. If override or low margin → **Review required** → owner/admin **Approve**  
 5. **Quotation** — preview, download **PDF / CSV / Excel**, mark as quoted  
@@ -110,7 +110,7 @@ Mobile/tablet: use the **menu** (top right) for navigation.
 
 | Item | Path |
 |---|---|
-| Live database | `backend/data/advanced_damp_local_prod.db` |
+| Live database | `backend/data/trade_estimating_local_prod.db` |
 | Backups | `backend/data/backups/` |
 | Application log | `backend/data/logs/app.log` |
 | Seed/sample rates | `backend/data/sample_seed.json` |
@@ -132,7 +132,7 @@ Mobile/tablet: use the **menu** (top right) for navigation.
 **Restore (test monthly):**
 
 ```powershell
-.\scripts\restore.ps1 advanced_damp-YYYYMMDD-HHMMSS.db
+.\scripts\restore.ps1 trade_estimating-YYYYMMDD-HHMMSS.db
 # Then restart the backend
 ```
 
@@ -227,7 +227,7 @@ These can be added later without rebuilding the pricing engine.
 | | Name | Date |
 |---|---|---|
 | Delivered by (developer) | | |
-| Accepted by (Advanced Damp) | | |
+| Accepted by (contractor) | | |
 | Commercial owner | | |
 
 **Notes / agreed tolerance for historical validation:**

@@ -22,8 +22,8 @@ The software runs on a **Windows office PC** (no cloud required). Sample commerc
    ```powershell
    .\scripts\start-production.ps1
    ```
-4. Sign in as **owner** (`owner@advanceddamp.co.uk` / `OwnerDamp1!`)  
-5. Open seeded estimate **AD-DEMO-01** (or create one) and walk through price review → quotation → PDF / CSV / Excel
+4. Sign in as **owner** (`owner@northbridge-demo.example` / `DemoOwner1!`)  
+5. Open seeded estimate **EST-DEMO-01** (or create one) and walk through price review → quotation → PDF / CSV / Excel
 
 ---
 
@@ -78,10 +78,10 @@ Complete **`docs/RELEASE_CHECKLIST.md`**, including:
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | admin@advanceddamp.co.uk | AdvancedDamp1! |
-| Owner | owner@advanceddamp.co.uk | OwnerDamp1! |
-| Surveyor | james.whitaker@advanceddamp.co.uk | Surveyor1! |
-| Office | office@advanceddamp.co.uk | OfficeDamp1! |
+| Admin | admin@northbridge-demo.example | DemoAdmin1! |
+| Owner | owner@northbridge-demo.example | DemoOwner1! |
+| Surveyor | james.whitaker@northbridge-demo.example | Surveyor1! |
+| Office | office@northbridge-demo.example | DemoOffice1! |
 
 ---
 

@@ -25,6 +25,20 @@ class RateItemRead(BaseModel):
     waste_percent: float
     notes: str
     active: int
+    effective_date: str = ""
+
+
+class RateVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    rate_item_id: int
+    previous_cost: float
+    new_cost: float
+    effective_date: str
+    reason: str
+    changed_by_name: str
+    created_at: str
 
 
 class RateListResponse(BaseModel):
@@ -45,6 +59,24 @@ class PricingSettingsRead(BaseModel):
     margins_by_work_type: dict[str, float]
     min_permitted_margin_percent: float = 20.0
     survey_fee_default: float = 195.0
+    company_display_name: str = ""
+    company_phone: str = ""
+    company_email: str = ""
+    company_address: str = ""
+    company_website: str = ""
+    company_tagline: str = ""
+    quote_prefix: str = "EST"
+
+
+class CompanyProfileRead(BaseModel):
+    name: str
+    phone: str
+    email: str
+    address: str
+    website: str
+    tagline: str
+    quote_prefix: str
+    app_name: str = ""
 
 
 class EstimateItemInput(BaseModel):
@@ -146,6 +178,13 @@ class EstimateRead(BaseModel):
     approved_by_user_id: int | None = None
     approved_at: str | None = None
     approval_notes: str = ""
+    quote_issued_at: str | None = None
+    quote_valid_until: str | None = None
+    accepted_at: str | None = None
+    accepted_by_name: str = ""
+    acceptance_method: str = ""
+    acceptance_po_reference: str = ""
+    acceptance_notes: str = ""
     breakdown: dict[str, Any] = Field(default_factory=dict)
     items: list[EstimateItemRead] = Field(default_factory=list)
 
@@ -163,6 +202,10 @@ class EstimateListResponse(BaseModel):
 class EstimateTransitionRequest(BaseModel):
     status: str
     notes: str = ""
+    accepted_by_name: str = ""
+    acceptance_method: str = ""
+    acceptance_po_reference: str = ""
+    acceptance_notes: str = ""
 
 
 class EstimateApproveRequest(BaseModel):
@@ -193,12 +236,39 @@ class ActualsRead(BaseModel):
     comparison: dict[str, Any]
 
 
+class ActualsSummaryItem(BaseModel):
+    estimate_id: int
+    reference: str
+    customer_name: str
+    status: str
+    estimated_cost: float
+    actual_cost: float
+    cost_variance: float
+    estimated_revenue: float
+    actual_revenue: float
+    estimated_margin_percent: float
+    actual_margin_percent: float
+    margin_percent_variance: float
+
+
+class ActualsSummaryResponse(BaseModel):
+    items: list[ActualsSummaryItem]
+    count: int
+    total_estimated_cost: float
+    total_actual_cost: float
+    total_cost_variance: float
+    average_estimated_margin_percent: float
+    average_actual_margin_percent: float
+
+
 class QuotationRead(BaseModel):
     estimate: EstimateRead
     company_name: str
     company_phone: str
     company_email: str
     company_address: str
+    company_website: str = ""
+    company_tagline: str = ""
     vat_rate: float
     vat_amount: float
     total_inc_vat: float

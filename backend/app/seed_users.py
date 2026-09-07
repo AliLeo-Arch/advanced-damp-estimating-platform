@@ -11,28 +11,28 @@ from app.models import PricingSettings, User, UserRole
 
 DEFAULT_USERS = [
     {
-        "email": "admin@advanceddamp.co.uk",
+        "email": "admin@northbridge-demo.example",
         "full_name": "System Administrator",
         "role": UserRole.ADMIN.value,
-        "password": "AdvancedDamp1!",
+        "password": "DemoAdmin1!",
     },
     {
-        "email": "owner@advanceddamp.co.uk",
+        "email": "owner@northbridge-demo.example",
         "full_name": "Commercial Manager",
         "role": UserRole.OWNER.value,
-        "password": "OwnerDamp1!",
+        "password": "DemoOwner1!",
     },
     {
-        "email": "james.whitaker@advanceddamp.co.uk",
+        "email": "james.whitaker@northbridge-demo.example",
         "full_name": "James Whitaker",
         "role": UserRole.SURVEYOR.value,
         "password": "Surveyor1!",
     },
     {
-        "email": "office@advanceddamp.co.uk",
+        "email": "office@northbridge-demo.example",
         "full_name": "Office Administrator",
         "role": UserRole.OFFICE.value,
-        "password": "OfficeDamp1!",
+        "password": "DemoOffice1!",
     },
 ]
 
@@ -87,10 +87,30 @@ def ensure_pricing_settings_defaults(db: Session) -> None:
         "[]",
     ):
         settings_row.exclusions_json = json.dumps(DEFAULT_EXCLUSIONS)
-    if not getattr(settings_row, "guarantee_wording", None):
+    if not getattr(settings_row, "guarantee_wording", None) or "Advanced Damp" in (
+        settings_row.guarantee_wording or ""
+    ):
         settings_row.guarantee_wording = DEFAULT_GUARANTEE
-    if not getattr(settings_row, "survey_fee_credit_wording", None):
+    if not getattr(settings_row, "survey_fee_credit_wording", None) or "Advanced Damp" in (
+        settings_row.survey_fee_credit_wording or ""
+    ):
         settings_row.survey_fee_credit_wording = DEFAULT_SURVEY_FEE_CREDIT
     if not getattr(settings_row, "acceptance_instructions", None):
         settings_row.acceptance_instructions = DEFAULT_ACCEPTANCE
+
+    # Seed company profile from env defaults when blank (generic white-label config)
+    if not getattr(settings_row, "company_display_name", None):
+        settings_row.company_display_name = settings.company_name
+    if not getattr(settings_row, "company_phone", None):
+        settings_row.company_phone = settings.company_phone
+    if not getattr(settings_row, "company_email", None):
+        settings_row.company_email = settings.company_email
+    if not getattr(settings_row, "company_address", None):
+        settings_row.company_address = settings.company_address
+    if not getattr(settings_row, "company_website", None):
+        settings_row.company_website = settings.company_website
+    if not getattr(settings_row, "company_tagline", None):
+        settings_row.company_tagline = "Specialist Trade Estimating & Quoting"
+    if not getattr(settings_row, "quote_prefix", None):
+        settings_row.quote_prefix = "EST"
     db.commit()

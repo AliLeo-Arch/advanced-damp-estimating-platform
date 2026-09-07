@@ -2,11 +2,13 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { EstimateListSkeleton, Spinner } from "../components/Loading";
 import {
+  ActualsSummary,
   Estimate,
   EstimateSearchFilters,
   EstimateSort,
   estimatesListCsvUrl,
   formatMoney,
+  getActualsSummary,
   getHealth,
   searchEstimates,
 } from "../api";
@@ -132,6 +134,9 @@ export default function DashboardPage() {
   const [healthDetail, setHealthDetail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actualsSummary, setActualsSummary] = useState<ActualsSummary | null>(
+    null,
+  );
 
   const activeFilterCount = countActiveFilters(filters);
   const exportUrl = estimatesListCsvUrl(filters);
@@ -156,9 +161,10 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const [health, result] = await Promise.all([
+        const [health, result, summary] = await Promise.all([
           getHealth(),
           searchEstimates(filters),
+          getActualsSummary(12).catch(() => null),
         ]);
         if (cancelled) return;
         setApiOk(health.status === "ok" && health.database_ok !== false);
@@ -174,6 +180,7 @@ export default function DashboardPage() {
         setTotalPages(result.total_pages);
         setHasNext(result.has_next);
         setHasPrev(result.has_prev);
+        setActualsSummary(summary);
       } catch (err) {
         if (cancelled) return;
         setApiOk(false);
@@ -316,6 +323,109 @@ export default function DashboardPage() {
           </span>
         </div>
       </div>
+
+      {actualsSummary && actualsSummary.count > 0 ? (
+        <div className="panel stack">
+          <div className="toolbar">
+            <h2 className="panel-title" style={{ margin: 0 }}>
+              Quoted vs actual
+            </h2>
+            <span className="muted">
+              {actualsSummary.count} job
+              {actualsSummary.count === 1 ? "" : "s"} with recorded costs
+            </span>
+          </div>
+          <div className="row">
+            <div className="field">
+              <span className="muted">Estimated cost</span>
+              <strong className="money">
+                {formatMoney(actualsSummary.total_estimated_cost)}
+              </strong>
+            </div>
+            <div className="field">
+              <span className="muted">Actual cost</span>
+              <strong className="money">
+                {formatMoney(actualsSummary.total_actual_cost)}
+              </strong>
+            </div>
+            <div className="field">
+              <span className="muted">Cost variance</span>
+              <strong
+                className={`money ${
+                  actualsSummary.total_cost_variance > 0
+                    ? "is-danger"
+                    : actualsSummary.total_cost_variance < 0
+                      ? "is-success"
+                      : ""
+                }`}
+              >
+                {formatMoney(actualsSummary.total_cost_variance)}
+              </strong>
+            </div>
+            <div className="field">
+              <span className="muted">Avg margin (est → act)</span>
+              <strong>
+                {actualsSummary.average_estimated_margin_percent.toFixed(1)}% →{" "}
+                {actualsSummary.average_actual_margin_percent.toFixed(1)}%
+              </strong>
+            </div>
+          </div>
+          <div className="variance-table-wrap">
+            <table className="variance-table">
+              <thead>
+                <tr>
+                  <th>Reference</th>
+                  <th>Customer</th>
+                  <th className="is-num">Est. cost</th>
+                  <th className="is-num">Act. cost</th>
+                  <th className="is-num">Cost Δ</th>
+                  <th className="is-num">Margin Δ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actualsSummary.items.map((row) => (
+                  <tr key={row.estimate_id}>
+                    <td>
+                      <Link to={`/estimates/${row.estimate_id}`}>
+                        {row.reference}
+                      </Link>
+                    </td>
+                    <td>{row.customer_name}</td>
+                    <td className="is-num money">
+                      {formatMoney(row.estimated_cost)}
+                    </td>
+                    <td className="is-num money">
+                      {formatMoney(row.actual_cost)}
+                    </td>
+                    <td
+                      className={`is-num money ${
+                        row.cost_variance > 0
+                          ? "is-danger"
+                          : row.cost_variance < 0
+                            ? "is-success"
+                            : ""
+                      }`}
+                    >
+                      {formatMoney(row.cost_variance)}
+                    </td>
+                    <td
+                      className={`is-num ${
+                        row.margin_percent_variance < 0
+                          ? "is-danger"
+                          : row.margin_percent_variance > 0
+                            ? "is-success"
+                            : ""
+                      }`}
+                    >
+                      {row.margin_percent_variance.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <form className="panel estimate-search-panel stack" onSubmit={onFilterSubmit}>
         <div className="estimate-search-header">

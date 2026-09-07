@@ -70,7 +70,7 @@ def build_comparison(estimate: Estimate, actuals: EstimateActuals) -> ActualsCom
     return ActualsComparison(
         materials=line("Materials", est_materials, act_materials),
         labour=line("Labour", est_labour, act_labour),
-        waste=line("Waste / skip", est_waste, act_waste),
+        waste=line("Waste", est_waste, act_waste),
         travel=line("Travel", est_travel, act_travel),
         prelims=line("Preliminaries", est_prelims, act_prelims),
         other=line("Other", est_other, act_other),

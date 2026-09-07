@@ -13,9 +13,9 @@ from app.models import Estimate, EstimateStatus, User
 from app.seed import _load_seed
 
 DEMO_SEEDS = (
-    ("DEMO-01", "AD-DEMO-01", EstimateStatus.READY_TO_QUOTE.value),
-    ("DEMO-05", "AD-DEMO-05", EstimateStatus.PRICED.value),
-    ("DEMO-04", "AD-DEMO-04", EstimateStatus.PRICED.value),
+    ("DEMO-01", "EST-DEMO-01", EstimateStatus.READY_TO_QUOTE.value),
+    ("DEMO-05", "EST-DEMO-05", EstimateStatus.PRICED.value),
+    ("DEMO-04", "EST-DEMO-04", EstimateStatus.PRICED.value),
 )
 
 
@@ -25,7 +25,9 @@ def seed_estimates_if_empty(db: Session) -> None:
         row["id"]: row for row in data.get("demo_scenarios") or [] if row.get("id")
     }
     surveyor = (
-        db.query(User).filter(User.email == "james.whitaker@advanceddamp.co.uk").first()
+        db.query(User)
+        .filter(User.email == "james.whitaker@northbridge-demo.example")
+        .first()
     )
 
     created = False

@@ -1,12 +1,12 @@
-# Production Demo Assets — Advanced Damp Estimating
+  Production Demo Assets — Advanced Damp Estimating
 
 Screenshots from the **local production foundation** (`v1.0.0-local-prod`) — captured after the original POC demo set.
 
-**Demo context:** Surveyor **James Whitaker** · estimate **AD-DEMO-04-R5** (Greenfield Lettings Ltd, Hackney E8 4AA) · sell **£1,607.64** · margin **28.0%**
+**Demo context:** Surveyor **James Whitaker** · estimate **EST-DEMO-04-R5** (Cedar Property Management Ltd, Reading RG1 2DE) · sell **£1,607.64** · margin **28.0%**
 
 ---
 
-## Folder layout
+   Folder layout
 
 ```text
 docs/production-demo/
@@ -20,7 +20,7 @@ docs/production-demo/
 
 ---
 
-## Screenshots
+   Screenshots
 
 | File | Screen | What it shows |
 |---|---|---|
@@ -31,16 +31,16 @@ docs/production-demo/
 
 ---
 
-## Relationship to POC assets
+   Relationship to POC assets
 
 | Set | Location | Scope |
 |---|---|---|
-| **POC demo** | `docs/poc-demo/screenshots/` | Original proof-of-concept walkthrough (AD-00001, five workflow steps + PDF) |
+| **POC demo** | `docs/poc-demo/screenshots/` | Original proof-of-concept walkthrough (EST-00001, five workflow steps + PDF) |
 | **Production demo** | `docs/production-demo/screenshots/` | Post-POC polish — login, dashboard table, editor UX, search & pagination |
 
 ---
 
-## Original filenames (renamed from)
+   Original filenames (renamed from)
 
 | Original | Renamed to |
 |---|---|

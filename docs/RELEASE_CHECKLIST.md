@@ -1,11 +1,11 @@
 # Local Production Release Checklist
 
 Version: **1.0.0-local-prod**  
-Use before handing off to Advanced Damp for live commercial use.
+Use before handing off to the deploying contractor for live commercial use.
 
 ## Environment
 
-- [ ] Production database created (`backend/data/advanced_damp_local_prod.db`)
+- [ ] Production database created (`backend/data/trade_estimating_local_prod.db`)
 - [ ] Default admin password changed
 - [ ] Real user accounts created (surveyor, office, owner)
 - [ ] JWT secret changed from default (`backend/app/config.py` or env)
@@ -31,7 +31,7 @@ Use before handing off to Advanced Damp for live commercial use.
 - [ ] CSV and Excel quotation downloads open correctly
 - [ ] Estimates search / status filter / pagination work
 - [ ] Rate table search / sort / pagination work (owner/admin)
-- [ ] Demo estimates (`AD-DEMO-*`) available for walkthrough (optional after live data)
+- [ ] Demo estimates (`EST-DEMO-*`) available for walkthrough (optional after live data)
 - [ ] Quoted → accepted → job actuals variance works
 - [ ] Permissions tested per role
 - [ ] Audit events recorded on create/update/approve/backup
@@ -54,7 +54,7 @@ Use before handing off to Advanced Damp for live commercial use.
 - [ ] 5–10 past jobs re-estimated within agreed commercial tolerance
 - [ ] Scenarios added to `backend/data/benchmark_jobs.json` (template provided)
 - [ ] `scripts/validate_benchmarks.py` passes with live rates
-- [ ] Advanced Damp sign-off on sample PDFs
+- [ ] Contractor sign-off on sample PDFs
 
 ## Automated tests (developer)
 

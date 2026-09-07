@@ -1,4 +1,4 @@
-# Advanced Damp Estimating — Admin Guide (Local Production)
+# Trade Estimating & Quoting — Admin Guide (Local Production)
 
 For owner/admin users managing commercial settings, backups, and users.
 
@@ -32,7 +32,7 @@ See `docs/LOCAL_PRODUCTION_ASSUMPTIONS.md` for demo credentials.
 - **Activate / Deactivate** without leaving the grid
 - **Add rate** — toggle the create form above the table
 
-Assumed seed rates are placeholders until Advanced Damp supplies live costs.
+Assumed seed rates are placeholders until the deploying contractor supplies live costs.
 
 ### Bulk edit via CSV
 
@@ -54,7 +54,7 @@ Staff can search and paginate estimates on the dashboard (see `docs/USER_GUIDE.m
 - Dashboard: filtered estimate list as CSV
 - Quotation step: PDF, CSV, Excel (`.xlsx` with Quotation + Internal sheets)
 
-**Demo estimates** (`AD-DEMO-01`, `AD-DEMO-04`, `AD-DEMO-05`) are seeded for walkthrough testing. They do not replace live CRM data.
+**Demo estimates** (`EST-DEMO-01`, `EST-DEMO-04`, `EST-DEMO-05`) are seeded for walkthrough testing. They do not replace live CRM data.
 
 API details: `docs/API_REFERENCE.md`.
 
@@ -63,7 +63,7 @@ API details: `docs/API_REFERENCE.md`.
 Reset from PowerShell (requires access to the office PC / database):
 
 ```powershell
-.\scripts\reset-password.ps1 admin@advanceddamp.co.uk "NewSecurePassword1!"
+.\scripts\reset-password.ps1 admin@northbridge-demo.example "NewSecurePassword1!"
 ```
 
 Change all demo passwords before staff use.
@@ -78,7 +78,7 @@ Default assumptions, exclusions, guarantee, survey-fee credit, and acceptance te
 
 **Admin** page (owner/admin):
 
-- **Create backup** — copies SQLite DB to `backend/data/backups/`
+- **Create backup** — online SQLite backup to `backend/data/backups/` (keeps latest 30 automatically)
 - **Download** — save a copy off the machine
 - **Restore** — replaces live DB (creates a pre-restore safety copy first). **Restart the backend** after restore.
 
@@ -86,18 +86,21 @@ Default assumptions, exclusions, guarantee, survey-fee credit, and acceptance te
 
 ```powershell
 .\scripts\backup.ps1
-.\scripts\restore.ps1 advanced_damp-YYYYMMDD-HHMMSS.db
+.\scripts\restore.ps1 trade_estimating-YYYYMMDD-HHMMSS.db
+
+# Optional: register a daily Windows Task Scheduler job (e.g. 02:00)
+.\scripts\register-daily-backup.ps1
 ```
 
 ### Policy (recommended)
 
-- Daily backup while in active use
+- Daily backup while in active use (use the Task Scheduler script above)
 - Keep copies on a second company-controlled location
 - Test restore monthly
 
 ## Logs
 
-Application log: `backend/data/logs/app.log`  
+Application log: `backend/data/logs/app.log` (rotates at ~5 MB, keeps 5 files)  
 Unhandled API errors are logged with stack traces.
 
 ## Health check

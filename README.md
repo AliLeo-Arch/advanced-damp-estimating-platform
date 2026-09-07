@@ -1,6 +1,6 @@
-# Advanced Damp — Local Production Estimating Platform
+# Trade Estimating & Quoting — Local Production Platform
 
-Web app for UK damp-proofing surveyors and office staff: CRM → survey → estimate → margin-controlled sell price → branded quotation PDF → job actuals.
+Configurable estimating and quoting platform for specialist contractors: CRM → survey → estimate → margin-controlled sell price → branded quotation PDF → job actuals.
 
 **Version:** 1.0.0-local-prod
 
@@ -8,9 +8,10 @@ Web app for UK damp-proofing surveyors and office staff: CRM → survey → esti
 
 | Document | Purpose |
 |---|---|
-| [`Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md`](./Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md) | Production blueprint |
-| [`Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md`](./Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md) | Original POC overview |
-| [`docs/CLIENT_HANDOFF.md`](./docs/CLIENT_HANDOFF.md) | **Client handoff pack** (start here) |
+| [`Generic_Trade_Estimating_Quoting_Platform_Product_Definition.md`](./Generic_Trade_Estimating_Quoting_Platform_Product_Definition.md) | Generic product definition & refactoring blueprint |
+| [`Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md`](./Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md) | Original client production blueprint (historical) |
+| [`Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md`](./Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md) | Original POC overview (historical) |
+| [`docs/CLIENT_HANDOFF.md`](./docs/CLIENT_HANDOFF.md) | **Handoff pack** (start here) |
 | [`docs/VERCEL_DEPLOYMENT.md`](./docs/VERCEL_DEPLOYMENT.md) | Deploy frontend + API on Vercel |
 | [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) | Recent features (search, exports, rate table, demos) |
 | [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md) | Estimate/rate search & export endpoints |
@@ -21,7 +22,7 @@ Web app for UK damp-proofing surveyors and office staff: CRM → survey → esti
 | [`docs/IMPLEMENTATION_STATUS.md`](./docs/IMPLEMENTATION_STATUS.md) | Phase A–G status and go-live gate |
 | [`docs/ACCEPTANCE_TEST_SCENARIOS.md`](./docs/ACCEPTANCE_TEST_SCENARIOS.md) | UAT scenarios A–J (+ K–M) |
 | [`docs/HISTORICAL_JOB_VALIDATION.md`](./docs/HISTORICAL_JOB_VALIDATION.md) | Real job sign-off worksheet |
-| [`docs/DELIVERY_NOTE.md`](./docs/DELIVERY_NOTE.md) | Short delivery summary for client |
+| [`docs/DELIVERY_NOTE.md`](./docs/DELIVERY_NOTE.md) | Short delivery summary |
 | [`docs/SCRIPTS_REFERENCE.md`](./docs/SCRIPTS_REFERENCE.md) | PowerShell scripts |
 | [`docs/RATE_IMPORT.md`](./docs/RATE_IMPORT.md) | Bulk rate CSV import & export |
 | [`docs/MOBILE_UI_UX_PRINCIPLES.md`](./docs/MOBILE_UI_UX_PRINCIPLES.md) | Mobile/tablet UX |
@@ -31,7 +32,7 @@ Web app for UK damp-proofing surveyors and office staff: CRM → survey → esti
 
 - **Frontend:** React + TypeScript (Vite) — port 5173
 - **Backend:** Python FastAPI — port 8000
-- **Database:** SQLite (`backend/data/advanced_damp_local_prod.db`)
+- **Database:** SQLite (`backend/data/trade_estimating_local_prod.db`)
 
 ## Run locally
 
@@ -81,10 +82,10 @@ If Vite or `npm run build` fails on Windows paths containing `&`, scripts alread
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `admin@advanceddamp.co.uk` | `AdvancedDamp1!` |
-| Owner | `owner@advanceddamp.co.uk` | `OwnerDamp1!` |
-| Surveyor | `james.whitaker@advanceddamp.co.uk` | `Surveyor1!` |
-| Office | `office@advanceddamp.co.uk` | `OfficeDamp1!` |
+| Admin | `admin@northbridge-demo.example` | `DemoAdmin1!` |
+| Owner | `owner@northbridge-demo.example` | `DemoOwner1!` |
+| Surveyor | `james.whitaker@northbridge-demo.example` | `Surveyor1!` |
+| Office | `office@northbridge-demo.example` | `DemoOffice1!` |
 
 Change passwords and JWT secret before live use.
 
@@ -101,11 +102,12 @@ Change passwords and JWT secret before live use.
 - Job actuals and variance
 - Admin backups, logging, health check
 - Single-port production mode (`start-production.ps1`)
+
 ## Backup
 
 ```powershell
 .\scripts\backup.ps1
-.\scripts\restore.ps1 advanced_damp-YYYYMMDD-HHMMSS.db
+.\scripts\restore.ps1 trade_estimating-YYYYMMDD-HHMMSS.db
 ```
 
 Or use **Admin** in the app (owner/admin). Restart the backend after restore.
@@ -118,4 +120,4 @@ Or use **Admin** in the app (owner/admin). Restart the backend after restore.
 
 ## Notes
 
-Placeholder commercial rates are used until Advanced Damp supplies live price lists. See `docs/RELEASE_CHECKLIST.md` before go-live.
+Placeholder commercial rates are used until the deploying contractor supplies live price lists. See `docs/RELEASE_CHECKLIST.md` before go-live.

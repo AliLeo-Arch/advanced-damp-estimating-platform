@@ -98,6 +98,17 @@ def serialize_estimate(estimate: Estimate) -> EstimateRead:
         approved_by_user_id=estimate.approved_by_user_id,
         approved_at=estimate.approved_at.isoformat() if estimate.approved_at else None,
         approval_notes=estimate.approval_notes or "",
+        quote_issued_at=estimate.quote_issued_at.isoformat()
+        if estimate.quote_issued_at
+        else None,
+        quote_valid_until=estimate.quote_valid_until.isoformat()
+        if estimate.quote_valid_until
+        else None,
+        accepted_at=estimate.accepted_at.isoformat() if estimate.accepted_at else None,
+        accepted_by_name=estimate.accepted_by_name or "",
+        acceptance_method=estimate.acceptance_method or "",
+        acceptance_po_reference=estimate.acceptance_po_reference or "",
+        acceptance_notes=estimate.acceptance_notes or "",
         breakdown=json.loads(estimate.breakdown_json or "{}"),
         items=items,
     )

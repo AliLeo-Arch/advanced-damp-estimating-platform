@@ -61,7 +61,7 @@ The platform combines:
 
 | Capability | Detail |
 |---|---|
-| **Five work types** | Chemical DPC & replastering, cavity drain membrane, sump & pump, timber treatment, condensation & ventilation |
+| **Five work types** | Injection treatment & replastering, cavity drain membrane, sump & pump, timber treatment, condensation & ventilation |
 | **Measurement capture** | Wall lengths, areas, package selections, multi-unit ventilation lines |
 | **Job-level allowances** | Travel bands, waste/skip, preliminaries allocated by direct-cost weight |
 | **Minimum job value** | Automatic uplift (default £750) when calculated sell is below threshold |
@@ -82,7 +82,7 @@ The platform combines:
 - **Estimate lifecycle** — `draft → priced → review_required → approved → ready_to_quote → quoted → accepted/declined/expired → closed`
 - **Approval gates** — overrides and below-target margins require owner/admin sign-off
 - **Minimum margin block** — quotations blocked when margin falls below permitted floor (default 20%)
-- **Revisions** — locked estimates can be revised (`AD-00001-R2`) without losing history
+- **Revisions** — locked estimates can be revised (`EST-00001-R2`) without losing history
 - **VAT snapshot** — rate and validity dates locked when quotation is issued
 
 ### CRM & administration
@@ -97,7 +97,7 @@ The platform combines:
 
 - **Estimates dashboard** — advanced search, status chips, date/price filters, pagination, URL-bookmarkable filters
 - **Rate admin** — server-side search, category filter, inactive toggle, sortable columns
-- **Demo seed data** — pre-priced estimates (`AD-DEMO-01`, `AD-DEMO-04`, `AD-DEMO-05`) for walkthrough testing
+- **Demo seed data** — pre-priced estimates (`EST-DEMO-01`, `EST-DEMO-04`, `EST-DEMO-05`) for walkthrough testing
 - **Estimate editor UX** — command bar, clickable workflow stepper, grouped actions, loading states
 
 ### Post-job costing
@@ -230,10 +230,10 @@ Validated pricing outcomes for representative UK jobs:
 
 | Scenario | Description | Benchmark sell (seed rates) |
 |---|---|---|
-| DEMO-01 | Bromley DPC + extractor | ~£2,152.67 ex VAT |
-| DEMO-02 | Greenwich basement membrane + sump | ~£13,152.65 ex VAT |
-| DEMO-03 | Tunbridge Wells wet rot | ~£2,351.46 ex VAT |
-| DEMO-04 | Hackney PIV + extractors | ~£1,607.64 ex VAT |
+| DEMO-01 | Reading DPC + extractor | ~£2,152.67 ex VAT |
+| DEMO-02 | Reading basement membrane + sump | ~£13,152.65 ex VAT |
+| DEMO-03 | Newbury wet rot | ~£2,351.46 ex VAT |
+| DEMO-04 | Reading PIV + extractors | ~£1,607.64 ex VAT |
 | DEMO-05 | Small localised DPC (min job) | £750.00 ex VAT |
 
 Run verification:
@@ -408,7 +408,7 @@ The software foundation is **complete and delivered**. Remaining steps are **cli
 ## Repository structure
 
 ```
-advanced-damp-estimating-platform/
+trade-estimating-quoting-platform/
 ├── frontend/          React + Vite UI
 ├── backend/           FastAPI API + pricing engine
 │   ├── app/           Application code

@@ -12,7 +12,7 @@ This is a **local/company-controlled** system, not internet-hardened SaaS. Findi
 | Severity | Count | Notes |
 |---|---:|---|
 | High (fix before live) | 2 | Default secrets/passwords |
-| Medium (accept or mitigate) | 3 | PDF token in URL, no login rate limit, CORS |
+| Medium (accept or mitigate) | 2 | PDF token in URL, CORS |
 | Low / informational | 4 | Health endpoint, logging, SQLite file ACLs |
 
 **No SQL injection issues found** — SQLAlchemy ORM used throughout; backup filenames validated against path traversal.
@@ -51,21 +51,19 @@ Browser PDF links use `?access_token=` because `<a href>` cannot send `Authoriza
 
 **Future:** Short-lived download tokens scoped to a single estimate.
 
-### M2 — No login rate limiting
+### M2 — Login rate limiting (in-process)
 
-**Location:** `backend/app/routers/auth.py:47-60`
+**Location:** `backend/app/login_throttle.py`, `backend/app/routers/auth.py`
 
-Brute-force attempts against `/api/auth/login` are not throttled.
+Failed logins are throttled in-process (8 failures / 15 minutes → 15-minute lockout per IP+email). Resets on successful login. Suitable for a single office API process; not a distributed rate limiter.
 
-**Mitigation (local):** Bind backend to `127.0.0.1` or office LAN firewall. For remote access, add reverse proxy rate limiting.
+**Mitigation (local):** Keep binding to office LAN. For multi-process or internet-facing deploy, add reverse-proxy rate limiting as well.
 
-### M3 — CORS limited to Vite dev origins
+### M3 — CORS configuration
 
-**Location:** `backend/app/main.py:43-52`
+**Location:** `backend/app/main.py`, `backend/.env.example`
 
-Only `localhost:5173` and `127.0.0.1:5173` allowed. Production build served from another port/host will need CORS updated.
-
-**Mitigation:** When using production mode (`SERVE_FRONTEND=true`), UI and API share port 8000 — no CORS issue. Dev mode uses Vite proxy on 5173.
+Dev defaults allow Vite origins. Production can set `CORS_ORIGINS` and optional Vercel preview regex. When `SERVE_FRONTEND=true`, UI and API share port 8000 — no CORS issue.
 
 ---
 
@@ -77,7 +75,7 @@ Returns version and DB status. Low risk on LAN; do not expose publicly without a
 
 ### L2 — SQLite database file on disk
 
-**Location:** `backend/data/advanced_damp_local_prod.db`
+**Location:** `backend/data/trade_estimating_local_prod.db`
 
 File-system access = full data access. Restrict folder permissions to admin/owner OS accounts.
 

@@ -1,10 +1,10 @@
-# Advanced Damp Estimating — User Guide (Local Production)
+# Trade Estimating & Quoting — User Guide (Local Production)
 
 For surveyors and office staff using the estimating tool day to day.
 
 ## Sign in
 
-Use your Advanced Damp email and password. Demo accounts are listed in `docs/LOCAL_PRODUCTION_ASSUMPTIONS.md` for local testing.
+Use your demo email and password. Demo accounts are listed in `docs/LOCAL_PRODUCTION_ASSUMPTIONS.md` for local testing.
 
 After sign-in you land on **Estimates**. If you are already signed in and open `/login`, you are redirected to the dashboard.
 
@@ -28,9 +28,9 @@ On a fresh database you should see seeded demo estimates such as:
 
 | Reference | Purpose |
 |---|---|
-| `AD-DEMO-01` | Full DPC job — ready to quote / PDF |
-| `AD-DEMO-05` | Minimum job (£750) example |
-| `AD-DEMO-04` | Mid-size ventilation example |
+| `EST-DEMO-01` | Full DPC job — ready to quote / PDF |
+| `EST-DEMO-05` | Minimum job (£750) example |
+| `EST-DEMO-04` | Mid-size ventilation example |
 
 Open one to walk through price review and quotation without creating data from scratch.
 

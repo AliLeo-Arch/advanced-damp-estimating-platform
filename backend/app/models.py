@@ -88,7 +88,7 @@ class Survey(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     site_id: Mapped[int] = mapped_column(ForeignKey("sites.id"), index=True)
     reference: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    survey_type: Mapped[str] = mapped_column(String(80), default="damp_survey")
+    survey_type: Mapped[str] = mapped_column(String(80), default="site_survey")
     survey_date: Mapped[str] = mapped_column(String(20), default="")
     surveyor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     surveyor_name: Mapped[str] = mapped_column(String(200), default="")
@@ -130,6 +130,33 @@ class RateItem(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     meta_json: Mapped[str] = mapped_column(Text, default="{}")
     active: Mapped[int] = mapped_column(Integer, default=1)
+    effective_date: Mapped[str] = mapped_column(String(20), default="")
+
+    versions: Mapped[list["RateVersion"]] = relationship(
+        "RateVersion", back_populates="rate", cascade="all, delete-orphan"
+    )
+
+
+class RateVersion(Base):
+    """Immutable cost history for a rate item (generic rate administration)."""
+
+    __tablename__ = "rate_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rate_item_id: Mapped[int] = mapped_column(ForeignKey("rate_items.id"), index=True)
+    previous_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    new_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    effective_date: Mapped[str] = mapped_column(String(20), default="")
+    reason: Mapped[str] = mapped_column(Text, default="")
+    changed_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    changed_by_name: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, index=True
+    )
+
+    rate: Mapped["RateItem"] = relationship("RateItem", back_populates="versions")
 
 
 class PricingSettings(Base):
@@ -148,6 +175,13 @@ class PricingSettings(Base):
     guarantee_wording: Mapped[str] = mapped_column(Text, default="")
     survey_fee_credit_wording: Mapped[str] = mapped_column(Text, default="")
     acceptance_instructions: Mapped[str] = mapped_column(Text, default="")
+    company_display_name: Mapped[str] = mapped_column(String(200), default="")
+    company_phone: Mapped[str] = mapped_column(String(50), default="")
+    company_email: Mapped[str] = mapped_column(String(200), default="")
+    company_address: Mapped[str] = mapped_column(String(500), default="")
+    company_website: Mapped[str] = mapped_column(String(300), default="")
+    company_tagline: Mapped[str] = mapped_column(String(300), default="")
+    quote_prefix: Mapped[str] = mapped_column(String(20), default="EST")
 
 
 class Estimate(Base):
@@ -200,6 +234,12 @@ class Estimate(Base):
     quote_issued_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     quote_valid_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     quote_vat_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    quotation_snapshot_json: Mapped[str] = mapped_column(Text, default="{}")
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    accepted_by_name: Mapped[str] = mapped_column(String(200), default="")
+    acceptance_method: Mapped[str] = mapped_column(String(80), default="")
+    acceptance_po_reference: Mapped[str] = mapped_column(String(120), default="")
+    acceptance_notes: Mapped[str] = mapped_column(Text, default="")
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

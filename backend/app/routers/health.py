@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.company import company_profile_from_db
 from app.config import settings
 from app.database import get_db
-from app.schemas import HealthResponse
+from app.schemas import CompanyProfileRead, HealthResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
@@ -29,4 +30,20 @@ def health(db: Session = Depends(get_db)) -> HealthResponse:
         version=settings.app_version,
         environment=settings.app_env,
         database_ok=db_ok,
+    )
+
+
+@router.get("/api/company", response_model=CompanyProfileRead)
+def company_profile(db: Session = Depends(get_db)) -> CompanyProfileRead:
+    """Public company branding for UI chrome and login footer."""
+    profile = company_profile_from_db(db)
+    return CompanyProfileRead(
+        name=profile.name,
+        phone=profile.phone,
+        email=profile.email,
+        address=profile.address,
+        website=profile.website,
+        tagline=profile.tagline,
+        quote_prefix=profile.quote_prefix,
+        app_name=settings.app_name,
     )

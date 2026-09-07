@@ -6,7 +6,7 @@
 **Client:** Advanced Damp Ltd  
 **Product type:** Local production estimating platform (evolved from POC)  
 **Version:** 1.0.0-local-prod  
-**Brand reference:** [https://advanceddamp.co.uk/](https://advanceddamp.co.uk/)  
+**Brand reference:** Local synthetic demo brand (see `docs/UI_UX_DESIGN_SYSTEM.md`)  
 **Currency / market:** GBP · United Kingdom  
 
 > **Delivery update (Aug 2026):** The POC has been extended into a **local production foundation** (Phases A–G). See `docs/IMPLEMENTATION_STATUS.md` and `docs/CLIENT_HANDOFF.md` for the current handoff pack. Commercial go-live still requires Advanced Damp live rates, historical job validation, and sign-off.
@@ -59,7 +59,7 @@ Prove that Advanced Damp’s estimating process can be converted into a practica
 - fast enough for on-site / same-day use;
 - simple enough for a non-technical business owner to understand;
 - commercially disciplined (margin and minimum job value); and
-- familiar in brand presentation to [advanceddamp.co.uk](https://advanceddamp.co.uk/).
+- familiar in brand presentation to a configurable contractor identity.
 
 ### 3.2 Demonstrated capabilities (implemented)
 
@@ -479,11 +479,12 @@ Full rules are documented in `docs/UI_UX_DESIGN_SYSTEM.md`.
 
 Generated server-side via ReportLab and downloadable from the quotation step (`/api/estimates/{id}/quotation.pdf`).
 
-Company contact details used in the POC quotation reflect the public website:
+Company contact details used in the generic demo quotation are synthetic:
 
-- Phone: 0300 373 7251  
-- Email: info@advanceddamp.co.uk  
-- London office: 45 Fitzroy St, London W1T 6EB  
+- Phone: 0118 496 0123  
+- Email: info@northbridge-demo.example  
+- Office: 12 Station Approach, Reading RG1 1LG  
+- Website: https://www.northbridge-demo.example  
 
 ---
 
@@ -497,7 +498,7 @@ Professional sample commercial data is provided in `backend/data/sample_seed.jso
 - target margins and minimum job value;
 - surveyors;
 - customer/site examples;
-- named demo scenarios (including the Bromley DPC + ventilation showcase and a minimum-job-value edge case).
+- named demo scenarios (including the Reading DPC + ventilation showcase and a minimum-job-value edge case).
 
 ### Example verified POC calculation
 
@@ -717,7 +718,7 @@ Future profitability analysis
 | Related v1 | `Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview.md` (original proposal) |
 | UI rules | `docs/UI_UX_DESIGN_SYSTEM.md` |
 | Sample data | `backend/data/sample_seed.json` |
-| Client website | https://advanceddamp.co.uk/ |
+| Demo website | https://www.northbridge-demo.example (synthetic) |
 
 ---
 

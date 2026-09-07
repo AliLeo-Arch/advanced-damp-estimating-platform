@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
 
 from app.actuals import build_comparison, comparison_to_dict
 from app.audit import write_audit
 from app.auth import get_current_user, require_permission
 from app.database import get_db
 from app.models import Estimate, EstimateActuals, EstimateStatus, User
-from app.schemas import ActualsRead, ActualsUpdate
+from app.pricing_engine import round_money
+from app.schemas import (
+    ActualsRead,
+    ActualsSummaryItem,
+    ActualsSummaryResponse,
+    ActualsUpdate,
+)
 
 router = APIRouter(prefix="/estimates", tags=["actuals"])
 
@@ -52,6 +58,84 @@ def _serialize(estimate: Estimate, actuals: EstimateActuals) -> ActualsRead:
         revenue_actual=actuals.revenue_actual,
         notes=actuals.notes or "",
         comparison=comparison_to_dict(comparison),
+    )
+
+
+@router.get("/actuals-summary", response_model=ActualsSummaryResponse)
+def actuals_summary(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=200),
+) -> ActualsSummaryResponse:
+    """Cross-job quoted-vs-actual reporting for jobs with recorded costs."""
+    rows = (
+        db.query(Estimate)
+        .options(joinedload(Estimate.actuals))
+        .join(EstimateActuals, EstimateActuals.estimate_id == Estimate.id)
+        .filter(Estimate.status.in_(sorted(ACTUALS_ELIGIBLE_STATUSES)))
+        .order_by(Estimate.updated_at.desc(), Estimate.id.desc())
+        .limit(limit)
+        .all()
+    )
+    items: list[ActualsSummaryItem] = []
+    for estimate in rows:
+        actuals = estimate.actuals
+        if not actuals:
+            continue
+        # Skip untouched zero rows so the dashboard shows meaningful jobs only.
+        touched = any(
+            [
+                actuals.materials_actual,
+                actuals.labour_actual,
+                actuals.waste_actual,
+                actuals.travel_actual,
+                actuals.prelims_actual,
+                actuals.other_actual,
+                actuals.revenue_actual is not None,
+                (actuals.notes or "").strip(),
+            ]
+        )
+        if not touched:
+            continue
+        comparison = build_comparison(estimate, actuals)
+        items.append(
+            ActualsSummaryItem(
+                estimate_id=estimate.id,
+                reference=estimate.reference,
+                customer_name=estimate.customer_name,
+                status=estimate.status,
+                estimated_cost=comparison.total_cost.estimated,
+                actual_cost=comparison.total_cost.actual,
+                cost_variance=comparison.total_cost.variance,
+                estimated_revenue=comparison.revenue.estimated,
+                actual_revenue=comparison.revenue.actual,
+                estimated_margin_percent=comparison.estimated_margin_percent,
+                actual_margin_percent=comparison.actual_margin_percent,
+                margin_percent_variance=comparison.margin_percent_variance,
+            )
+        )
+
+    count = len(items)
+    total_est = round_money(sum(item.estimated_cost for item in items))
+    total_act = round_money(sum(item.actual_cost for item in items))
+    avg_est_margin = (
+        round(sum(item.estimated_margin_percent for item in items) / count, 2)
+        if count
+        else 0.0
+    )
+    avg_act_margin = (
+        round(sum(item.actual_margin_percent for item in items) / count, 2)
+        if count
+        else 0.0
+    )
+    return ActualsSummaryResponse(
+        items=items,
+        count=count,
+        total_estimated_cost=total_est,
+        total_actual_cost=total_act,
+        total_cost_variance=round_money(total_act - total_est),
+        average_estimated_margin_percent=avg_est_margin,
+        average_actual_margin_percent=avg_act_margin,
     )
 
 

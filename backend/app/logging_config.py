@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
@@ -19,7 +20,14 @@ def configure_logging() -> None:
         log_dir = Path(__file__).resolve().parent.parent / "data" / "logs"
         try:
             log_dir.mkdir(parents=True, exist_ok=True)
-            handlers.append(logging.FileHandler(log_dir / "app.log", encoding="utf-8"))
+            handlers.append(
+                RotatingFileHandler(
+                    log_dir / "app.log",
+                    maxBytes=5 * 1024 * 1024,
+                    backupCount=5,
+                    encoding="utf-8",
+                )
+            )
         except OSError:
             pass
 

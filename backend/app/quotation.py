@@ -6,7 +6,7 @@ import json
 import re
 from datetime import date, datetime, timedelta
 from io import BytesIO
-from urllib.request import urlopen
+from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -23,15 +23,15 @@ from reportlab.platypus import (
 )
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.company import resolve_company_profile
 from app.estimate_service import get_settings, serialize_estimate
 from app.lifecycle import assert_can_issue_quotation
 from app.models import Estimate, PricingSettings
 from app.pricing_engine import round_money
 from app.schemas import QuotationRead
 
-LOGO_URL = (
-    "https://advanceddamp.co.uk/wp-content/uploads/2026/05/Advanced-Damp-1-copy.png"
+LOGO_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "brand" / "trade-estimating-logo.png"
 )
 
 DEFAULT_ASSUMPTIONS = [
@@ -48,14 +48,14 @@ DEFAULT_EXCLUSIONS = [
 ]
 
 DEFAULT_GUARANTEE = (
-    "Where applicable, works are offered with Advanced Damp's standard guarantee "
+    "Where applicable, works are offered with the contractor's standard guarantee "
     "subject to correct use, maintenance, and payment in full. Guarantee certificates "
     "are issued on completion as appropriate to the treatment."
 )
 
 DEFAULT_SURVEY_FEE_CREDIT = (
     "Where a survey fee has been paid and the customer proceeds with the quoted works, "
-    "the survey fee may be credited against the works invoice in line with Advanced Damp policy."
+    "the survey fee may be credited against the works invoice in line with company policy."
 )
 
 DEFAULT_ACCEPTANCE = (
@@ -136,13 +136,16 @@ def build_quotation(db: Session, estimate: Estimate) -> QuotationRead:
 
     vat_amount = round_money(subtotal * vat_rate)
     terms = quotation_terms(settings_row)
+    company = resolve_company_profile(settings_row)
 
     return QuotationRead(
         estimate=read,
-        company_name=settings.company_name,
-        company_phone=settings.company_phone,
-        company_email=settings.company_email,
-        company_address=settings.company_address,
+        company_name=company.name,
+        company_phone=company.phone,
+        company_email=company.email,
+        company_address=company.address,
+        company_website=company.website,
+        company_tagline=company.tagline,
         vat_rate=vat_rate,
         vat_amount=vat_amount,
         total_inc_vat=round_money(subtotal + vat_amount),
@@ -164,7 +167,7 @@ def build_quotation(db: Session, estimate: Estimate) -> QuotationRead:
 
 
 def lock_quotation_snapshot(db: Session, estimate: Estimate) -> Estimate:
-    """Persist issue date / validity / VAT when marking quoted."""
+    """Persist issue date / validity / VAT and a commercial snapshot when marking quoted."""
     settings_row = get_settings(db)
     if not estimate.quote_issued_at:
         estimate.quote_issued_at = datetime.utcnow()
@@ -175,6 +178,29 @@ def lock_quotation_snapshot(db: Session, estimate: Estimate) -> Estimate:
         )
     if estimate.quote_vat_rate is None:
         estimate.quote_vat_rate = float(settings_row.vat_rate or 0.20)
+    # Immutable commercial freeze for this issued quotation (SQLite-friendly JSON).
+    estimate.quotation_snapshot_json = json.dumps(
+        {
+            "reference": estimate.reference,
+            "revision_no": estimate.revision_no or 1,
+            "sell_price": estimate.sell_price,
+            "total_cost": estimate.total_cost,
+            "margin_percent": estimate.margin_percent,
+            "margin_value": estimate.margin_value,
+            "vat_rate": estimate.quote_vat_rate,
+            "issued_at": estimate.quote_issued_at.isoformat()
+            if estimate.quote_issued_at
+            else None,
+            "valid_until": estimate.quote_valid_until.isoformat()
+            if estimate.quote_valid_until
+            else None,
+            "customer_name": estimate.customer_name,
+            "site_address": estimate.site_address,
+            "postcode": estimate.postcode,
+            "breakdown": json.loads(estimate.breakdown_json or "{}"),
+            "rates_snapshot": json.loads(estimate.rates_snapshot_json or "{}"),
+        }
+    )
     db.commit()
     db.refresh(estimate)
     return estimate
@@ -188,10 +214,11 @@ def _safe_filename(quote: QuotationRead) -> str:
 
 def _load_logo() -> Image | None:
     try:
-        data = urlopen(LOGO_URL, timeout=5).read()
-        img = Image(BytesIO(data))
+        if not LOGO_PATH.is_file():
+            return None
+        img = Image(str(LOGO_PATH))
         img.drawHeight = 16 * mm
-        img.drawWidth = 55 * mm
+        img.drawWidth = 64 * mm
         return img
     except Exception:
         return None
@@ -201,7 +228,7 @@ def render_quotation_pdf(quote: QuotationRead) -> tuple[BytesIO, str]:
     buffer = BytesIO()
     styles = getSampleStyleSheet()
     title = ParagraphStyle(
-        "ADTitle",
+        "QuoteTitle",
         parent=styles["Heading1"],
         textColor=colors.HexColor("#0C1644"),
         fontSize=18,
@@ -209,7 +236,7 @@ def render_quotation_pdf(quote: QuotationRead) -> tuple[BytesIO, str]:
         fontName="Helvetica-Bold",
     )
     heading = ParagraphStyle(
-        "ADHeading",
+        "QuoteHeading",
         parent=styles["Heading2"],
         textColor=colors.HexColor("#0C1644"),
         fontSize=12,
@@ -218,21 +245,21 @@ def render_quotation_pdf(quote: QuotationRead) -> tuple[BytesIO, str]:
         fontName="Helvetica-Bold",
     )
     body = ParagraphStyle(
-        "ADBody",
+        "QuoteBody",
         parent=styles["Normal"],
         textColor=colors.HexColor("#0C0D0E"),
         fontSize=9.5,
         leading=13,
     )
     muted = ParagraphStyle(
-        "ADMuted",
+        "QuoteMuted",
         parent=body,
         textColor=colors.HexColor("#706F6F"),
         fontSize=8.5,
         leading=11,
     )
     accent = ParagraphStyle(
-        "ADAccent",
+        "QuoteAccent",
         parent=body,
         textColor=colors.HexColor("#FF5F14"),
         fontSize=9,
@@ -276,11 +303,12 @@ def render_quotation_pdf(quote: QuotationRead) -> tuple[BytesIO, str]:
         [
             Paragraph(quote.company_name, title),
             Paragraph(
-                "Damp Proofing & Structural Waterproofing Specialists", muted
+                quote.company_tagline or "Specialist Trade Estimating & Quoting", muted
             ),
             Paragraph(
                 f"{quote.company_address}<br/>"
-                f"{quote.company_phone} · {quote.company_email}",
+                f"{quote.company_phone} · {quote.company_email}<br/>"
+                f"{quote.company_website or ''}",
                 muted,
             ),
             Spacer(1, 8),

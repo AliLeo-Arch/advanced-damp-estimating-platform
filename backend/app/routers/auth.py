@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,11 @@ from app.auth import (
 )
 from app.audit import write_audit
 from app.database import get_db
+from app.login_throttle import (
+    assert_login_allowed,
+    record_login_failure,
+    record_login_success,
+)
 from app.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -44,11 +49,24 @@ def _user_read(user: User) -> UserRead:
     )
 
 
+def _throttle_key(request: Request, email: str) -> str:
+    client = request.client.host if request.client else "unknown"
+    return f"{client}:{email.lower().strip()}"
+
+
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(
+    payload: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> TokenResponse:
+    key = _throttle_key(request, payload.email)
+    assert_login_allowed(key)
     user = db.query(User).filter(User.email == payload.email.lower()).first()
     if not user or not user.active or not verify_password(payload.password, user.password_hash):
+        record_login_failure(key)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    record_login_success(key)
     token = create_access_token(user)
     write_audit(
         db,

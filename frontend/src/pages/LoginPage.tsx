@@ -9,7 +9,7 @@ type LoginPageProps = {
 
 export default function LoginPage({ onSignedIn }: LoginPageProps) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("james.whitaker@advanceddamp.co.uk");
+  const [email, setEmail] = useState("james.whitaker@northbridge-demo.example");
   const [password, setPassword] = useState("Surveyor1!");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -38,7 +38,7 @@ export default function LoginPage({ onSignedIn }: LoginPageProps) {
             Sign in
           </h1>
           <p className="login-lead">
-            Local production access for Advanced Damp estimating users.
+            Local production access for Trade Estimating & Quoting users.
           </p>
         </header>
 
@@ -79,10 +79,11 @@ export default function LoginPage({ onSignedIn }: LoginPageProps) {
       </div>
 
       <p className="login-hint muted">
-        Demo: surveyor <code>james.whitaker@advanceddamp.co.uk</code> /{" "}
+        Demo: surveyor <code>james.whitaker@northbridge-demo.example</code> /{" "}
         <code>Surveyor1!</code>
         {" · "}
-        owner <code>owner@advanceddamp.co.uk</code> / <code>OwnerDamp1!</code>
+        owner <code>owner@northbridge-demo.example</code> /{" "}
+        <code>DemoOwner1!</code>
       </p>
     </section>
   );

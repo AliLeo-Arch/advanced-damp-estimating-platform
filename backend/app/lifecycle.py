@@ -12,7 +12,7 @@ from app.models import Estimate, EstimateItem, EstimateStatus, User
 from app.estimate_service import get_settings
 
 
-# Assumed production transitions (confirm with Advanced Damp)
+# Assumed production transitions (confirm with deploying contractor)
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     EstimateStatus.DRAFT.value: {
         EstimateStatus.PRICED.value,
@@ -167,7 +167,7 @@ def create_revision(db: Session, source: Estimate, *, actor: User) -> Estimate:
         pass
 
     next_rev = (source.revision_no or 1) + 1
-    # Keep family reference readable: AD-00001 → AD-00001-R2
+    # Keep family reference readable: EST-00001 → EST-00001-R2
     base_ref = source.reference.split("-R")[0]
     new_ref = f"{base_ref}-R{next_rev}"
     while db.query(Estimate).filter(Estimate.reference == new_ref).first():
@@ -215,6 +215,15 @@ def create_revision(db: Session, source: Estimate, *, actor: User) -> Estimate:
         approval_notes="",
         approved_by_user_id=None,
         approved_at=None,
+        quote_issued_at=None,
+        quote_valid_until=None,
+        quote_vat_rate=None,
+        quotation_snapshot_json="{}",
+        accepted_at=None,
+        accepted_by_name="",
+        acceptance_method="",
+        acceptance_po_reference="",
+        acceptance_notes="",
     )
     db.add(clone)
     db.flush()

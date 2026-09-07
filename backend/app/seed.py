@@ -12,11 +12,11 @@ from app.models import PricingSettings, RateItem
 SEED_PATH = Path(__file__).resolve().parent.parent / "data" / "sample_seed.json"
 
 WORK_TYPE_LABELS = {
-    "dpc_replastering": "Chemical DPC Injection & Replastering",
-    "cavity_drain": "Cavity Drain Membrane Systems",
-    "sump_pump": "Sump & Pump Installations",
-    "timber_treatment": "Timber Treatment",
-    "ventilation": "Condensation & Ventilation",
+    "injection_replaster": "Injection Treatment & Replastering",
+    "membrane_waterproofing": "Membrane Waterproofing System",
+    "pump_package": "Pump / Drainage Package",
+    "timber_remediation": "Timber Remedial Treatment",
+    "ventilation_installation": "Ventilation Equipment",
 }
 
 
@@ -148,6 +148,13 @@ def seed_rates_if_empty(db: Session) -> None:
             margins_json=json.dumps(margins),
             min_permitted_margin_percent=20.0,
             survey_fee_default=195.0,
+            company_display_name="Northbridge Property Services Ltd",
+            company_phone="0118 496 0123",
+            company_email="info@northbridge-demo.example",
+            company_address="12 Station Approach, Reading RG1 1LG",
+            company_website="https://www.northbridge-demo.example",
+            company_tagline="Specialist Trade Estimating & Quoting",
+            quote_prefix="EST",
         )
     )
     db.commit()

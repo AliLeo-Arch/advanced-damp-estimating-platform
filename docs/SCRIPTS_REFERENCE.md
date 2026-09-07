@@ -16,8 +16,9 @@ All PowerShell scripts run from the **repository root** unless noted.
 |---|---|
 | `export-rates.ps1` | Export active rates to `backend/data/rates_export.csv` |
 | `import-rates.ps1` | Import/update rates from CSV (`-DryRun` to validate) |
-| `backup.ps1` | Copy SQLite DB to `backend/data/backups/` |
-| `restore.ps1` | Restore DB — `restore.ps1 advanced_damp-YYYYMMDD-HHMMSS.db` |
+| `backup.ps1` | Online SQLite backup to `backend/data/backups/` (keeps latest 30) |
+| `restore.ps1` | Restore DB — `restore.ps1 trade_estimating-YYYYMMDD-HHMMSS.db` |
+| `register-daily-backup.ps1` | Register Windows Task Scheduler daily backup |
 
 ## Admin & verification
 
@@ -49,7 +50,7 @@ npm install
 .\scripts\import-rates.ps1 backend\data\rates_export.csv
 
 # Secure accounts before staff use
-.\scripts\reset-password.ps1 admin@advanceddamp.co.uk "YourNewPassword1!"
+.\scripts\reset-password.ps1 admin@northbridge-demo.example "YourNewPassword1!"
 
 # Confirm everything works
 .\scripts\verify-delivery.ps1

@@ -187,7 +187,7 @@ export default function CustomersPage() {
         <form className="row" onSubmit={onCreateCustomer}>
           <div className="field">
             <label>Name</label>
-            <input name="name" required placeholder="Mrs Helen Carter" />
+            <input name="name" required placeholder="Ms Emma Thompson" />
           </div>
           <div className="field">
             <label>Type</label>
@@ -252,15 +252,15 @@ export default function CustomersPage() {
             </div>
             <div className="field">
               <label>Address</label>
-              <input name="address_line1" required placeholder="18 Maple Avenue" />
+              <input name="address_line1" required placeholder="24 Cedar Road" />
             </div>
             <div className="field">
               <label>Town</label>
-              <input name="town" placeholder="Bromley" />
+              <input name="town" placeholder="Reading" />
             </div>
             <div className="field">
               <label>Postcode</label>
-              <input name="postcode" placeholder="BR1 2NP" />
+              <input name="postcode" placeholder="RG1 4AB" />
             </div>
             <button className="btn btn-secondary field-action" type="submit">
               Add site
@@ -317,7 +317,7 @@ export default function CustomersPage() {
               <textarea
                 name="recommended_works"
                 rows={2}
-                placeholder="Chemical DPC and replastering to 1.2 m"
+                placeholder="Injection treatment and replastering to 1.2 m"
               />
             </div>
             <button className="btn btn-primary" type="submit">

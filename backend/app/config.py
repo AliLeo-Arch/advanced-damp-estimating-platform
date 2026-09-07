@@ -11,9 +11,9 @@ from pydantic_settings import BaseSettings
 
 def _default_database_url() -> str:
     if os.getenv("VERCEL") or os.getenv("VERCEL_ENV"):
-        return "sqlite:////tmp/advanced_damp_prod.db"
+        return "sqlite:////tmp/trade_estimating_prod.db"
     return (
-        f"sqlite:///{Path(__file__).resolve().parent.parent / 'data' / 'advanced_damp_local_prod.db'}"
+        f"sqlite:///{Path(__file__).resolve().parent.parent / 'data' / 'trade_estimating_local_prod.db'}"
     )
 
 
@@ -24,16 +24,17 @@ def _default_app_env() -> str:
 
 
 class Settings(BaseSettings):
-    app_name: str = "Advanced Damp Estimating"
+    app_name: str = "Trade Estimating & Quoting"
     app_env: str = Field(default_factory=_default_app_env)
     database_url: str = Field(default_factory=_default_database_url)
-    company_name: str = "Advanced Damp Ltd"
-    company_phone: str = "0300 373 7251"
-    company_email: str = "info@advanceddamp.co.uk"
-    company_address: str = "45 Fitzroy St, London W1T 6EB"
+    company_name: str = "Northbridge Property Services Ltd"
+    company_phone: str = "0118 496 0123"
+    company_email: str = "info@northbridge-demo.example"
+    company_address: str = "12 Station Approach, Reading RG1 1LG"
+    company_website: str = "https://www.northbridge-demo.example"
     default_vat_rate: float = 0.20
     currency: str = "GBP"
-    jwt_secret: str = "advanced-damp-local-prod-change-me"
+    jwt_secret: str = "trade-estimating-local-prod-change-me"
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 12
     assumed_survey_fee: float = 195.0
@@ -64,4 +65,4 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-DEFAULT_JWT_SECRET = "advanced-damp-local-prod-change-me"
+DEFAULT_JWT_SECRET = "trade-estimating-local-prod-change-me"

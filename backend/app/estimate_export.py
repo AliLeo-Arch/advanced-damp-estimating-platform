@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from sqlalchemy.orm import Session
 
+from app.actuals import build_comparison
 from app.estimate_service import serialize_estimate
 from app.models import Estimate
 from app.pricing_engine import round_money
@@ -40,6 +41,7 @@ def _quotation_rows(db: Session, estimate: Estimate) -> tuple[dict, list[dict]]:
         "vat_rate": quote.vat_rate,
         "vat_amount": quote.vat_amount,
         "total_inc_vat": quote.total_inc_vat,
+        "issuer_name": quote.company_name,
     }
     lines = [
         {
@@ -56,7 +58,7 @@ def render_estimate_csv(db: Session, estimate: Estimate) -> tuple[bytes, str]:
     header, lines = _quotation_rows(db, estimate)
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["Advanced Damp Ltd — Customer quotation export"])
+    writer.writerow([f"{header['issuer_name']} — Customer quotation export"])
     writer.writerow(["Reference", header["reference"]])
     writer.writerow(["Customer", header["customer_name"]])
     writer.writerow(["Site", f"{header['site_address']} {header['postcode']}".strip()])
@@ -85,7 +87,7 @@ def render_estimate_xlsx(db: Session, estimate: Estimate) -> tuple[bytes, str]:
     quote_sheet = wb.active
     quote_sheet.title = "Quotation"
     bold = Font(bold=True)
-    quote_sheet["A1"] = "Advanced Damp Ltd — Quotation"
+    quote_sheet["A1"] = f"{header['issuer_name']} — Quotation"
     quote_sheet["A1"].font = bold
     quote_sheet.append(["Reference", header["reference"]])
     quote_sheet.append(["Customer", header["customer_name"]])
@@ -154,12 +156,29 @@ def render_estimates_list_csv(estimates: Iterable[Estimate]) -> bytes:
             "Postcode",
             "Status",
             "Sell (ex VAT)",
-            "Margin %",
+            "Quoted margin %",
+            "Estimated cost",
+            "Actual cost",
+            "Cost variance",
+            "Actual margin %",
+            "Margin % variance",
             "Surveyor",
             "Survey date",
         ]
     )
     for row in estimates:
+        actuals = getattr(row, "actuals", None)
+        estimated_cost = f"{(row.total_cost or 0):.2f}"
+        actual_cost = ""
+        cost_variance = ""
+        actual_margin = ""
+        margin_var = ""
+        if actuals is not None:
+            comparison = build_comparison(row, actuals)
+            actual_cost = f"{comparison.total_cost.actual:.2f}"
+            cost_variance = f"{comparison.total_cost.variance:.2f}"
+            actual_margin = f"{comparison.actual_margin_percent:.2f}"
+            margin_var = f"{comparison.margin_percent_variance:.2f}"
         writer.writerow(
             [
                 row.reference,
@@ -169,6 +188,11 @@ def render_estimates_list_csv(estimates: Iterable[Estimate]) -> bytes:
                 row.status,
                 f"{row.sell_price:.2f}",
                 f"{row.margin_percent:.2f}",
+                estimated_cost,
+                actual_cost,
+                cost_variance,
+                actual_margin,
+                margin_var,
                 row.surveyor,
                 row.survey_date,
             ]

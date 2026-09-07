@@ -1,4 +1,4 @@
-"""Advanced Damp Estimating API — local production foundation."""
+"""Trade Estimating & Quoting API — local production foundation."""
 
 from __future__ import annotations
 
@@ -48,8 +48,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Advanced Damp Estimating API",
-    description="Estimating platform API for Advanced Damp Ltd.",
+    title="Trade Estimating & Quoting API",
+    description="Configurable estimating and quotation platform API for specialist contractors.",
     version=settings.app_version,
     lifespan=lifespan,
 )

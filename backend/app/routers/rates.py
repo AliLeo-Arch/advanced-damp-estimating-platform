@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -12,9 +13,15 @@ from app.audit import write_audit
 from app.auth import get_current_user, require_permission
 from app.database import get_db
 from app.estimate_service import get_settings
-from app.models import RateItem, User
+from app.models import RateItem, RateVersion, User
 from app.rate_query import RateSearchParams, pagination_meta, search_rates
-from app.schemas import PricingSettingsRead, RateItemRead, RateListResponse
+from app.rate_versions import record_rate_version
+from app.schemas import (
+    PricingSettingsRead,
+    RateItemRead,
+    RateListResponse,
+    RateVersionRead,
+)
 
 router = APIRouter(prefix="/rates", tags=["rates"])
 
@@ -56,6 +63,8 @@ class RateItemUpdate(BaseModel):
     waste_percent: float | None = Field(default=None, ge=0, le=100)
     notes: str | None = None
     active: bool | None = None
+    change_reason: str | None = None
+    effective_date: str | None = None
 
 
 class PricingSettingsUpdate(BaseModel):
@@ -66,9 +75,19 @@ class PricingSettingsUpdate(BaseModel):
     margins_by_work_type: dict[str, float] | None = None
     min_permitted_margin_percent: float | None = Field(default=None, ge=0, le=100)
     survey_fee_default: float | None = Field(default=None, ge=0)
+    company_display_name: str | None = None
+    company_phone: str | None = None
+    company_email: str | None = None
+    company_address: str | None = None
+    company_website: str | None = None
+    company_tagline: str | None = None
+    quote_prefix: str | None = Field(default=None, max_length=20)
 
 
 def _settings_read(settings) -> PricingSettingsRead:
+    from app.company import resolve_company_profile
+
+    profile = resolve_company_profile(settings)
     return PricingSettingsRead(
         minimum_job_value=settings.minimum_job_value,
         vat_rate=settings.vat_rate,
@@ -77,6 +96,13 @@ def _settings_read(settings) -> PricingSettingsRead:
         margins_by_work_type=json.loads(settings.margins_json or "{}"),
         min_permitted_margin_percent=settings.min_permitted_margin_percent or 20.0,
         survey_fee_default=settings.survey_fee_default or 195.0,
+        company_display_name=profile.name,
+        company_phone=profile.phone,
+        company_email=profile.email,
+        company_address=profile.address,
+        company_website=profile.website,
+        company_tagline=profile.tagline,
+        quote_prefix=profile.quote_prefix,
     )
 
 
@@ -162,8 +188,19 @@ def create_rate(
         waste_percent=payload.waste_percent,
         notes=payload.notes,
         active=1 if payload.active else 0,
+        effective_date=date.today().isoformat(),
     )
     db.add(rate)
+    db.flush()
+    record_rate_version(
+        db,
+        rate,
+        previous_cost=0.0,
+        new_cost=rate.cost_per_unit,
+        reason="Initial rate created",
+        effective_date=rate.effective_date,
+        actor=user,
+    )
     db.commit()
     db.refresh(rate)
     write_audit(
@@ -177,6 +214,36 @@ def create_rate(
     return rate
 
 
+@router.get("/{rate_id}/versions", response_model=list[RateVersionRead])
+def list_rate_versions(
+    rate_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_permission("manage_rates")),
+) -> list[RateVersionRead]:
+    rate = db.get(RateItem, rate_id)
+    if not rate:
+        raise HTTPException(status_code=404, detail="Rate not found")
+    rows = (
+        db.query(RateVersion)
+        .filter(RateVersion.rate_item_id == rate_id)
+        .order_by(RateVersion.created_at.desc(), RateVersion.id.desc())
+        .all()
+    )
+    return [
+        RateVersionRead(
+            id=row.id,
+            rate_item_id=row.rate_item_id,
+            previous_cost=row.previous_cost,
+            new_cost=row.new_cost,
+            effective_date=row.effective_date or "",
+            reason=row.reason or "",
+            changed_by_name=row.changed_by_name or "",
+            created_at=row.created_at.isoformat() if row.created_at else "",
+        )
+        for row in rows
+    ]
+
+
 @router.put("/{rate_id}", response_model=RateItemRead)
 def update_rate(
     rate_id: int,
@@ -188,10 +255,25 @@ def update_rate(
     if not rate:
         raise HTTPException(status_code=404, detail="Rate not found")
     data = payload.model_dump(exclude_unset=True)
+    change_reason = data.pop("change_reason", None) or ""
+    effective_date = data.pop("effective_date", None) or ""
     if "active" in data:
         data["active"] = 1 if data["active"] else 0
+    previous_cost = float(rate.cost_per_unit)
     for key, value in data.items():
         setattr(rate, key, value)
+    if "cost_per_unit" in data and abs(float(data["cost_per_unit"]) - previous_cost) > 1e-9:
+        stamp = effective_date or date.today().isoformat()
+        rate.effective_date = stamp
+        record_rate_version(
+            db,
+            rate,
+            previous_cost=previous_cost,
+            new_cost=float(rate.cost_per_unit),
+            reason=change_reason or "Cost updated",
+            effective_date=stamp,
+            actor=user,
+        )
     db.commit()
     db.refresh(rate)
     write_audit(
@@ -204,6 +286,7 @@ def update_rate(
             "cost_per_unit": rate.cost_per_unit,
             "active": bool(rate.active),
             "changed": list(data.keys()),
+            "change_reason": change_reason,
         },
         actor=user,
     )

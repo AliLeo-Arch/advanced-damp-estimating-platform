@@ -52,6 +52,13 @@ export type Estimate = {
   approved_by_user_id?: number | null;
   approved_at?: string | null;
   approval_notes?: string;
+  quote_issued_at?: string | null;
+  quote_valid_until?: string | null;
+  accepted_at?: string | null;
+  accepted_by_name?: string;
+  acceptance_method?: string;
+  acceptance_po_reference?: string;
+  acceptance_notes?: string;
   breakdown: Record<string, unknown>;
   items: EstimateItem[];
 };
@@ -93,6 +100,18 @@ export type RateItem = {
   waste_percent: number;
   notes: string;
   active: number;
+  effective_date?: string;
+};
+
+export type RateVersion = {
+  id: number;
+  rate_item_id: number;
+  previous_cost: number;
+  new_cost: number;
+  effective_date: string;
+  reason: string;
+  changed_by_name: string;
+  created_at: string;
 };
 
 export type PricingSettings = {
@@ -103,6 +122,24 @@ export type PricingSettings = {
   margins_by_work_type: Record<string, number>;
   min_permitted_margin_percent?: number;
   survey_fee_default?: number;
+  company_display_name?: string;
+  company_phone?: string;
+  company_email?: string;
+  company_address?: string;
+  company_website?: string;
+  company_tagline?: string;
+  quote_prefix?: string;
+};
+
+export type CompanyProfile = {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  website: string;
+  tagline: string;
+  quote_prefix: string;
+  app_name?: string;
 };
 
 export type Quotation = {
@@ -111,6 +148,8 @@ export type Quotation = {
   company_phone: string;
   company_email: string;
   company_address: string;
+  company_website?: string;
+  company_tagline?: string;
   vat_rate: number;
   vat_amount: number;
   total_inc_vat: number;
@@ -356,10 +395,27 @@ export function approveEstimate(id: number, notes = "") {
   });
 }
 
-export function transitionEstimate(id: number, status: string, notes = "") {
+export function transitionEstimate(
+  id: number,
+  status: string,
+  notes = "",
+  acceptance?: {
+    accepted_by_name?: string;
+    acceptance_method?: string;
+    acceptance_po_reference?: string;
+    acceptance_notes?: string;
+  },
+) {
   return request<Estimate>(`/api/estimates/${id}/transition`, {
     method: "POST",
-    body: JSON.stringify({ status, notes }),
+    body: JSON.stringify({
+      status,
+      notes,
+      accepted_by_name: acceptance?.accepted_by_name || "",
+      acceptance_method: acceptance?.acceptance_method || "",
+      acceptance_po_reference: acceptance?.acceptance_po_reference || "",
+      acceptance_notes: acceptance?.acceptance_notes || "",
+    }),
   });
 }
 
@@ -406,6 +462,37 @@ export type JobActuals = {
 
 export function getJobActuals(estimateId: number) {
   return request<JobActuals>(`/api/estimates/${estimateId}/actuals`);
+}
+
+export type ActualsSummaryItem = {
+  estimate_id: number;
+  reference: string;
+  customer_name: string;
+  status: string;
+  estimated_cost: number;
+  actual_cost: number;
+  cost_variance: number;
+  estimated_revenue: number;
+  actual_revenue: number;
+  estimated_margin_percent: number;
+  actual_margin_percent: number;
+  margin_percent_variance: number;
+};
+
+export type ActualsSummary = {
+  items: ActualsSummaryItem[];
+  count: number;
+  total_estimated_cost: number;
+  total_actual_cost: number;
+  total_cost_variance: number;
+  average_estimated_margin_percent: number;
+  average_actual_margin_percent: number;
+};
+
+export function getActualsSummary(limit = 50) {
+  return request<ActualsSummary>(
+    `/api/estimates/actuals-summary?limit=${encodeURIComponent(String(limit))}`,
+  );
 }
 
 export function updateJobActuals(
@@ -532,6 +619,8 @@ export function updateRate(
     waste_percent?: number;
     notes?: string;
     active?: boolean;
+    change_reason?: string;
+    effective_date?: string;
   },
 ) {
   return request<RateItem>(`/api/rates/${id}`, {
@@ -540,8 +629,16 @@ export function updateRate(
   });
 }
 
+export function listRateVersions(rateId: number) {
+  return request<RateVersion[]>(`/api/rates/${rateId}/versions`);
+}
+
 export function getPricingSettings() {
   return request<PricingSettings>("/api/rates/settings");
+}
+
+export function getCompanyProfile() {
+  return request<CompanyProfile>("/api/company");
 }
 
 export function updatePricingSettings(payload: {
@@ -552,6 +649,13 @@ export function updatePricingSettings(payload: {
   margins_by_work_type?: Record<string, number>;
   min_permitted_margin_percent?: number;
   survey_fee_default?: number;
+  company_display_name?: string;
+  company_phone?: string;
+  company_email?: string;
+  company_address?: string;
+  company_website?: string;
+  company_tagline?: string;
+  quote_prefix?: string;
 }) {
   return request<PricingSettings>("/api/rates/settings", {
     method: "PUT",

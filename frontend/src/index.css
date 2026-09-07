@@ -78,11 +78,12 @@ select {
 }
 
 .brand-logo {
-  height: 58px;
-  width: auto;
-  max-width: min(220px, 42vw);
+  height: 48px;
+  width: 48px;
+  max-width: none;
   display: block;
   object-fit: contain;
+  flex-shrink: 0;
 }
 
 .brand-text {
@@ -1547,12 +1548,14 @@ select {
   }
 
   .brand-logo {
-    height: 50px;
-    max-width: min(200px, 48vw);
+    height: 40px;
+    width: 40px;
+    max-width: none;
   }
 
   .app-shell.is-login .brand-logo {
-    height: 54px;
+    height: 48px;
+    width: 48px;
   }
 
   .app-nav-desktop {

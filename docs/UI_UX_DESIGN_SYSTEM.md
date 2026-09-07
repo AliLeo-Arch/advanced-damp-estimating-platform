@@ -1,25 +1,26 @@
-# Advanced Damp Estimating — UI/UX Design Principles & Rules
+# Trade Estimating & Quoting — UI/UX Design Principles & Rules
 
-**Source of brand truth:** [https://advanceddamp.co.uk/](https://advanceddamp.co.uk/)  
-**Product:** Internal estimating & quoting tool (surveyors + business owner)  
-**Goal:** Familiar Advanced Damp brand language adapted for a fast, field-usable work tool — not a marketing clone.
+**Brand source:** Local synthetic demo brand (Northbridge Property Services Ltd)  
+**Logo assets:** `frontend/public/brand/trade-estimating-mark.svg`  
+**Product:** Configurable estimating & quoting tool for specialist contractors  
+**Goal:** Neutral professional brand language adapted for a fast, field-usable work tool — not a marketing site clone.
 
 ---
 
-## 1. Product context (how this differs from the website)
+## 1. Product context (how this differs from a marketing website)
 
-| Website | Estimating platform |
+| Marketing website | Estimating platform |
 |---|---|
 | Persuade homeowners & commercial clients | Help surveyors price jobs accurately |
 | Marketing hero, stories, trust logos | Dense forms, numbers, margin visibility |
 | Browse & enquire | Create → calculate → quote → save |
 | Public audience | Internal / semi-internal users |
 
-**Rule:** Borrow brand identity (logo, colour, type, tone). Do **not** copy marketing layout patterns (full-bleed heroes, review carousels, service grids) into the app shell.
+**Rule:** Use configurable brand identity (logo, colour, type, tone). Do **not** copy marketing layout patterns (full-bleed heroes, review carousels, service grids) into the app shell.
 
 ---
 
-## 2. Brand identity extracted from the website
+## 2. Brand identity (demo defaults)
 
 ### 2.1 Colour tokens
 
@@ -39,39 +40,40 @@
 | `--ad-danger` | `#870000` | Errors | Below-target margin, validation |
 | `--ad-danger-bg` | `#FFDEDE` | Soft error | Warning banners |
 
-**Do not use** the previous POC teal/cream palette (`#0d5c4d`, warm paper `#f3f0e8`). It fights the live Advanced Damp brand.
+**Do not use** a teal/cream palette (`#0d5c4d`, warm paper `#f3f0e8`) as the primary product identity.
 
 ### 2.2 Typography
 
 | Role | Family | Weight | Notes |
 |---|---|---|---|
-| Display / brand / page titles | **Red Hat Display** | 700 | Matches website CTAs and headlines |
-| UI / body / forms / tables | **Montserrat** | 400–600 | Matches website body stack |
+| Display / brand / page titles | **Red Hat Display** | 700 | Headlines and brand chrome |
+| UI / body / forms / tables | **Montserrat** | 400–600 | Body and form stack |
 | Tabular numbers (money, %) | Montserrat | 600 | `font-variant-numeric: tabular-nums` |
 
 **Forbidden for this product:** Instrument Serif, DM Sans, Inter-as-brand, generic system-only stacks as the primary identity.
 
 ### 2.3 Logo & naming
 
-- Wordmark / logo asset (from site):  
-  `https://advanceddamp.co.uk/wp-content/uploads/2026/05/Advanced-Damp-1-copy.png`  
-  Prefer a local copy under `frontend/public/brand/` for offline POC reliability.
-- Product label in chrome: **Advanced Damp** + muted subtitle **Estimating** (not a competing product name).
-- Customer-facing PDFs: full company details from site  
-  - Phone: `0300 373 7251`  
-  - Email: `info@advanceddamp.co.uk`  
-  - London office: `45 Fitzroy St, London W1T 6EB`  
-  - Site: `https://advanceddamp.co.uk/`
+- Logo assets (local only):  
+  - Mark: `frontend/public/brand/trade-estimating-mark.svg`  
+  - Wordmark: `frontend/public/brand/trade-estimating-logo.svg`  
+  - PDF: `backend/data/brand/trade-estimating-logo.png`
+- Product label in chrome: **Trade Estimating** + muted subtitle **Quoting**
+- Customer-facing PDFs: company details from configuration  
+  - Phone: `0118 496 0123`  
+  - Email: `info@northbridge-demo.example`  
+  - Office: `12 Station Approach, Reading RG1 1LG`  
+  - Site: `https://www.northbridge-demo.example` (synthetic demo only)
 
 ### 2.4 Voice & microcopy
 
-Align with site principles: diagnose clearly, no guesswork, no pressure, plain English.
+Align with clear, diagnostic principles: diagnose clearly, no guesswork, no pressure, plain English.
 
 | Do | Don't |
 |---|---|
 | “Create estimate”, “Generate quotation”, “Margin below target” | “Awesome!”, emoji-heavy toasts |
 | “Site measurements”, “Scope of works” | Vague “Stuff”, “Items” |
-| Short instructional leads under titles | Marketing slogans in the app (“Done Right First Time” as page chrome) |
+| Short instructional leads under titles | Marketing slogans in the app as page chrome |
 | Flag commercial risk calmly | Alarmist or gamified language |
 
 ---
@@ -153,16 +155,16 @@ Numbers are exact (£0.00). Show units (lm, m²). Explain adjustments (minimum j
 | Work scope builder | Clear work-type list matching company services language |
 | Measurement forms | Dynamic fields; progress of required inputs |
 | Pricing summary | Margin health dominant; override controls grouped |
-| Quotation preview | Looks like an Advanced Damp document |
+| Quotation preview | Looks like a professional contractor quotation |
 | Rate admin | Owner-safe editing; codes + units obvious |
 | PDF | Logo, navy headings, orange used sparingly for headers/rules only |
 
 **Work-type labels** should match the website vocabulary where possible:
 - Chemical DPC / Rising damp & replastering  
-- Cavity drain membrane  
-- Sump & pump  
-- Timber treatment (dry rot / wet rot / woodworm as specs later)  
-- Condensation & ventilation  
+- Membrane waterproofing  
+- Pump / drainage package  
+- Timber remedial treatment (dry rot / wet rot / woodworm as specs later)  
+- Ventilation equipment  
 
 ---
 
@@ -178,7 +180,7 @@ Numbers are exact (£0.00). Show units (lm, m²). Explain adjustments (minimum j
 
 ## 8. Explicit anti-patterns
 
-- Teal/sage “construction SaaS” theme unrelated to Advanced Damp  
+- Teal/sage “construction SaaS” theme unrelated to the configured brand tokens  
 - Warm cream + terracotta “AI default” palette  
 - Purple gradients, glow, glassmorphism  
 - Emoji as status indicators  
@@ -213,4 +215,4 @@ When changing UI, verify:
 
 ---
 
-*POC note: Visual familiarity supports client trust. Exact print letterhead / logo clearance can be refined when Advanced Damp supplies brand assets formally.*
+*Note: Visual familiarity supports trust. Print letterhead / logo clearance can be refined when a deploying contractor supplies their own brand assets.*

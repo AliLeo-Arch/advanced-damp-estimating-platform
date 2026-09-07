@@ -7,16 +7,16 @@ from app.models import Estimate
 
 
 def test_safe_filename():
-    name = _safe_filename("AD-DEMO-01", "Mrs Helen Carter", "Quotation.csv")
-    assert name == "AD-DEMO-01-Mrs-Helen-Carter-Quotation.csv"
+    name = _safe_filename("EST-DEMO-01", "Ms Emma Thompson", "Quotation.csv")
+    assert name == "EST-DEMO-01-Ms-Emma-Thompson-Quotation.csv"
 
 
 def test_render_estimates_list_csv():
     row = Estimate(
-        reference="AD-DEMO-01",
-        customer_name="Mrs Helen Carter",
-        site_address="12 Oak Road",
-        postcode="BR1 3AA",
+        reference="EST-DEMO-01",
+        customer_name="Ms Emma Thompson",
+        site_address="24 Cedar Road",
+        postcode="RG1 4AB",
         surveyor="James Whitaker",
         survey_date="2026-08-15",
         status="ready_to_quote",
@@ -29,6 +29,6 @@ def test_render_estimates_list_csv():
     data = render_estimates_list_csv([row])
     text = data.decode("utf-8-sig")
     assert "Reference,Customer,Site" in text
-    assert "AD-DEMO-01" in text
-    assert "Mrs Helen Carter" in text
+    assert "EST-DEMO-01" in text
+    assert "Ms Emma Thompson" in text
     assert "2583.20" in text

@@ -11,8 +11,8 @@ def test_render_pdf_reconciles_and_is_valid_pdf():
     lines = [
         EstimateItemRead(
             id=1,
-            work_type="dpc_replastering",
-            label="Chemical DPC Injection & Replastering",
+            work_type="injection_replaster",
+            label="Injection Treatment & Replastering",
             sort_order=0,
             measurements={},
             description="DPC works",
@@ -22,8 +22,8 @@ def test_render_pdf_reconciles_and_is_valid_pdf():
         ),
         EstimateItemRead(
             id=2,
-            work_type="cavity_drain",
-            label="Cavity Drain Membrane Systems",
+            work_type="membrane_waterproofing",
+            label="Membrane Waterproofing System",
             sort_order=1,
             measurements={},
             description="Membrane works",
@@ -36,7 +36,7 @@ def test_render_pdf_reconciles_and_is_valid_pdf():
     # Force a 1p drift then rely on builder-side correction path via QuotationRead direct
     estimate = EstimateRead(
         id=1,
-        reference="AD-00099",
+        reference="EST-00099",
         revision_no=2,
         customer_name="Mrs Smith",
         site_address="12 High Street",
@@ -52,10 +52,12 @@ def test_render_pdf_reconciles_and_is_valid_pdf():
     )
     quote = QuotationRead(
         estimate=estimate,
-        company_name="Advanced Damp Ltd",
-        company_phone="0300 373 7251",
-        company_email="info@advanceddamp.co.uk",
-        company_address="45 Fitzroy St, London W1T 6EB",
+        company_name="Northbridge Property Services Ltd",
+        company_phone="0118 496 0123",
+        company_email="info@northbridge-demo.example",
+        company_address="12 Station Approach, Reading RG1 1LG",
+        company_website="https://www.northbridge-demo.example",
+        company_tagline="Specialist Trade Estimating & Quoting",
         vat_rate=0.2,
         vat_amount=round_money(subtotal * 0.2),
         total_inc_vat=round_money(subtotal * 1.2),
@@ -84,7 +86,7 @@ def test_render_pdf_reconciles_and_is_valid_pdf():
     buffer, filename = render_quotation_pdf(quote)
     data = buffer.read()
     assert data.startswith(b"%PDF")
-    assert "AD-00099" in filename
+    assert "EST-00099" in filename
     assert "Mrs-Smith" in filename
     assert "Quotation.pdf" in filename
 
@@ -95,7 +97,7 @@ def test_pricing_lines_still_sum_to_sell():
     result = calculate_estimate(
         work_items=[
             {
-                "work_type": "dpc_replastering",
+                "work_type": "injection_replaster",
                 "measurements": {
                     "walls": 1,
                     "wall_length_lm": 10,
@@ -103,7 +105,7 @@ def test_pricing_lines_still_sum_to_sell():
                 },
             },
             {
-                "work_type": "cavity_drain",
+                "work_type": "membrane_waterproofing",
                 "measurements": {
                     "wall_area_m2": 15,
                     "floor_area_m2": 8,
@@ -113,7 +115,7 @@ def test_pricing_lines_still_sum_to_sell():
             },
         ],
         rates=SAMPLE_RATES,
-        margins_by_type={"dpc_replastering": 35.0, "cavity_drain": 32.0},
+        margins_by_type={"injection_replaster": 35.0, "membrane_waterproofing": 32.0},
         travel_band_code="TRV-LOCAL",
         waste_code="WS-ALLOW-SMALL",
         prelim_codes=["PRE-STD"],
