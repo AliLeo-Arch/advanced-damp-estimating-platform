@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { EstimateListSkeleton, Spinner } from "../components/Loading";
+import { CountGridSkeleton, EstimateListSkeleton, Refreshable, Spinner } from "../components/Loading";
+import { useLoadMode } from "../hooks/useAsyncLoad";
 import StatusPill from "../components/StatusPill";
 import {
   ActualsSummary,
@@ -131,7 +132,7 @@ export default function DashboardPage() {
   const [apiOk, setApiOk] = useState<boolean | null>(null);
   const [healthDetail, setHealthDetail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { loading, refreshing, begin, end } = useLoadMode();
   const [actualsSummary, setActualsSummary] = useState<ActualsSummary | null>(
     null,
   );
@@ -171,9 +172,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const generation = begin();
 
     async function load() {
-      setLoading(true);
       setError(null);
       try {
         const [health, result, summary, ops] = await Promise.all([
@@ -207,7 +208,7 @@ export default function DashboardPage() {
             : "Could not reach the estimating API. Is the backend running?",
         );
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) end(generation);
       }
     }
 
@@ -215,7 +216,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [filters]);
+  }, [filters, begin, end]);
 
   function updateParams(
     patch: Partial<Record<string, string | number | string[] | undefined>>,
@@ -338,30 +339,67 @@ export default function DashboardPage() {
 
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = total === 0 ? 0 : Math.min(page * pageSize, total);
+  const statusFilter = filters.status || [];
+  const pipelineAllActive = statusFilter.length === 0;
+
+  function pipelineCardClass(statusKey: string | null) {
+    const active =
+      statusKey === null
+        ? pipelineAllActive
+        : statusFilter.length === 1 && statusFilter[0] === statusKey;
+    return `ops-count-card${active ? " is-active" : ""}`;
+  }
 
   return (
-    <section className="stack">
-      <div className="page-header page-header-compact">
-        <h1 className="page-title">Estimates</h1>
-        <p className="page-lead">
-          Search, filter, and open saved estimates or create a new one from site
-          survey details
-          {user?.role === "surveyor"
-            ? " · showing your active draft pipeline by default"
-            : user?.role === "office"
-              ? " · focused on ready-to-quote and quoted work"
-              : user?.role === "accounts"
-                ? " · focused on accepted and quoted commercial work"
-                : ""}
-          .
-        </p>
-      </div>
-
-      <div className="toolbar dashboard-toolbar">
-        <div className="dashboard-toolbar-actions">
-          <Link className="btn btn-primary" to="/estimates/new">
-            New estimate
-          </Link>
+    <section className="stack estimates-page">
+      <div className="page-header estimates-page-header">
+        <div className="estimates-page-heading">
+          <h1 className="page-title">Estimates</h1>
+          <p className="page-lead">
+            Search, filter, and open saved estimates — or create a new one from
+            site survey details
+            {user?.role === "surveyor"
+              ? ". Showing your active draft pipeline by default"
+              : user?.role === "office"
+                ? ". Focused on ready-to-quote and quoted work"
+                : user?.role === "accounts"
+                  ? ". Focused on accepted and quoted commercial work"
+                  : ""}
+            .
+          </p>
+        </div>
+        <div className="estimates-page-actions">
+          <div
+            className="api-status api-status-compact"
+            title={
+              apiOk && healthDetail
+                ? healthDetail
+                : apiOk === false
+                  ? "API unreachable"
+                  : undefined
+            }
+          >
+            <span
+              className={`api-dot ${apiOk === true ? "is-ok" : apiOk === false ? "is-bad" : "is-pending"}`}
+              aria-hidden
+            />
+            <span className="api-status-text">
+              {loading ? (
+                <>
+                  <Spinner
+                    size="sm"
+                    className="api-status-spinner"
+                    label="Checking connection"
+                  />
+                  Checking…
+                </>
+              ) : apiOk ? (
+                "Online"
+              ) : (
+                "Offline"
+              )}
+            </span>
+          </div>
           {!loading && total > 0 ? (
             <a
               className="btn btn-secondary"
@@ -369,40 +407,23 @@ export default function DashboardPage() {
               target="_blank"
               rel="noreferrer"
             >
-              Export results (CSV)
+              Export CSV
             </a>
           ) : null}
-        </div>
-        <div className="api-status">
-          <span
-            className={`api-dot ${apiOk === true ? "is-ok" : apiOk === false ? "is-bad" : "is-pending"}`}
-            aria-hidden
-          />
-          <span className="api-status-text">
-            {loading ? (
-              <>
-                <Spinner
-                  size="sm"
-                  className="api-status-spinner"
-                  label="Checking connection"
-                />
-                Checking…
-              </>
-            ) : (
-              <>
-                {apiOk ? "Online" : "Offline"}
-                {healthDetail && apiOk ? ` · ${healthDetail}` : ""}
-              </>
-            )}
-          </span>
+          <Link className="btn btn-primary" to="/estimates/new">
+            New estimate
+          </Link>
         </div>
       </div>
 
-      {opsSummary ? (
+      {loading && !opsSummary ? (
+        <CountGridSkeleton count={6} />
+      ) : opsSummary ? (
         <div className="ops-count-grid" aria-label="Estimate pipeline counts">
           <button
             type="button"
-            className="ops-count-card"
+            className={pipelineCardClass(null)}
+            aria-pressed={pipelineAllActive}
             onClick={() => updateParams({ status: undefined }, true)}
           >
             <span className="ops-count-label">All</span>
@@ -410,7 +431,8 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
-            className="ops-count-card"
+            className={pipelineCardClass("draft")}
+            aria-pressed={statusFilter.length === 1 && statusFilter[0] === "draft"}
             onClick={() => updateParams({ status: ["draft"] }, true)}
           >
             <span className="ops-count-label">Draft</span>
@@ -418,7 +440,10 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
-            className="ops-count-card"
+            className={pipelineCardClass("review_required")}
+            aria-pressed={
+              statusFilter.length === 1 && statusFilter[0] === "review_required"
+            }
             onClick={() => updateParams({ status: ["review_required"] }, true)}
           >
             <span className="ops-count-label">Review</span>
@@ -426,7 +451,10 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
-            className="ops-count-card"
+            className={pipelineCardClass("ready_to_quote")}
+            aria-pressed={
+              statusFilter.length === 1 && statusFilter[0] === "ready_to_quote"
+            }
             onClick={() => updateParams({ status: ["ready_to_quote"] }, true)}
           >
             <span className="ops-count-label">Ready to quote</span>
@@ -434,7 +462,8 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
-            className="ops-count-card"
+            className={pipelineCardClass("quoted")}
+            aria-pressed={statusFilter.length === 1 && statusFilter[0] === "quoted"}
             onClick={() => updateParams({ status: ["quoted"] }, true)}
           >
             <span className="ops-count-label">Quoted</span>
@@ -442,7 +471,10 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
-            className="ops-count-card"
+            className={pipelineCardClass("accepted")}
+            aria-pressed={
+              statusFilter.length === 1 && statusFilter[0] === "accepted"
+            }
             onClick={() => updateParams({ status: ["accepted"] }, true)}
           >
             <span className="ops-count-label">Accepted</span>
@@ -557,28 +589,28 @@ export default function DashboardPage() {
       <form className="panel estimate-search-panel stack" onSubmit={onFilterSubmit}>
         <div className="estimate-search-header">
           <div>
-            <h2 className="panel-title" style={{ margin: 0 }}>
-              Search &amp; filter
-            </h2>
+            <h2 className="panel-title estimate-search-title">Find estimates</h2>
             <p className="muted estimate-search-lead">
-              Find estimates by customer, reference, site, surveyor, status, or
-              value.
+              Filter by customer, reference, site, surveyor, status, or value.
             </p>
           </div>
           <div className="estimate-search-header-actions">
             {activeFilterCount > 0 ? (
-              <span className="filter-count-badge">{activeFilterCount} active</span>
+              <span className="filter-count-badge">
+                {activeFilterCount} active
+              </span>
             ) : null}
             <button
-              className="btn btn-secondary"
+              className={`btn btn-secondary${showAdvanced ? " is-pressed" : ""}`}
               type="button"
+              aria-expanded={showAdvanced}
               onClick={() => setShowAdvanced((open) => !open)}
             >
-              {showAdvanced ? "Hide advanced" : "Advanced filters"}
+              {showAdvanced ? "Hide advanced" : "Advanced"}
             </button>
             {activeFilterCount > 0 ? (
               <button
-                className="btn btn-secondary"
+                className="btn btn-ghost"
                 type="button"
                 onClick={clearFilters}
               >
@@ -863,7 +895,7 @@ export default function DashboardPage() {
               <button
                 className="btn btn-secondary"
                 type="button"
-                disabled={!hasPrev}
+                  disabled={!hasPrev || refreshing}
                 onClick={() => updateParams({ page: page - 1 })}
               >
                 Previous
@@ -874,7 +906,7 @@ export default function DashboardPage() {
               <button
                 className="btn btn-secondary"
                 type="button"
-                disabled={!hasNext}
+                  disabled={!hasNext || refreshing}
                 onClick={() => updateParams({ page: page + 1 })}
               >
                 Next
@@ -884,7 +916,7 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <EstimateListSkeleton count={pageSize > 5 ? 5 : pageSize} />
+          <EstimateListSkeleton count={pageSize > 6 ? 6 : pageSize} />
         ) : estimates.length === 0 ? (
           <div className="empty-state estimates-table-empty">
             <strong>
@@ -898,7 +930,7 @@ export default function DashboardPage() {
             <div className="step-actions" style={{ justifyContent: "center" }}>
               {activeFilterCount > 0 ? (
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-ghost"
                   type="button"
                   onClick={clearFilters}
                 >
@@ -912,7 +944,11 @@ export default function DashboardPage() {
             </div>
           </div>
         ) : (
-          <div className="estimates-table-wrap">
+          <Refreshable
+            refreshing={refreshing}
+            label="Updating estimates…"
+            className="estimates-table-wrap"
+          >
             <table className="estimates-table">
               <thead>
                 <tr>
@@ -1055,7 +1091,7 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </Refreshable>
         )}
 
         {!loading && totalPages > 1 ? (
@@ -1066,7 +1102,7 @@ export default function DashboardPage() {
             <button
               className="btn btn-secondary"
               type="button"
-              disabled={!hasPrev}
+                  disabled={!hasPrev || refreshing}
               onClick={() => updateParams({ page: page - 1 })}
             >
               Previous
@@ -1077,7 +1113,7 @@ export default function DashboardPage() {
             <button
               className="btn btn-secondary"
               type="button"
-              disabled={!hasNext}
+                  disabled={!hasNext || refreshing}
               onClick={() => updateParams({ page: page + 1 })}
             >
               Next

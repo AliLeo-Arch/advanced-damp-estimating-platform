@@ -1,0 +1,14 @@
+{
+  "name": "trade-estimating-demo-video-kit",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Standalone Playwright utility to record a professional Trade Estimating & Quoting product demo video. Not part of the application runtime.",
+  "type": "module",
+  "scripts": {
+    "record": "node src/record.mjs",
+    "install:browsers": "node ./node_modules/playwright/cli.js install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  }
+}

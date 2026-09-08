@@ -86,7 +86,7 @@ export default function SideDrawer({
             {subtitle ? <p className="side-drawer-subtitle">{subtitle}</p> : null}
           </div>
           <button
-            className="btn btn-secondary btn-compact"
+            className="btn btn-ghost btn-compact"
             type="button"
             onClick={onClose}
           >

@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-09-08T15:44:34.506Z",
+  "base_url": "http://127.0.0.1:5173",
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "user": "admin@northbridge-demo.example",
+  "chapters": [
+    "Opening title",
+    "Login & estimates dashboard",
+    "Dashboard filters",
+    "Customers & CRM detail",
+    "Reports",
+    "Rates admin",
+    "Settings",
+    "Admin backups",
+    "New estimate",
+    "Estimate wizard",
+    "Lifecycle & quotation",
+    "User menu",
+    "Closing title"
+  ],
+  "files": [
+    "trade-estimating-product-demo.webm"
+  ]
+}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { PanelSkeleton } from "../components/Loading";
+import { CountGridSkeleton, PanelSkeleton } from "../components/Loading";
 import StatusPill from "../components/StatusPill";
 import {
   ActualsSummary,
@@ -65,7 +65,10 @@ export default function ReportsPage() {
       {error ? <div className="error-banner">{error}</div> : null}
 
       {loading ? (
-        <PanelSkeleton rows={6} />
+        <>
+          <CountGridSkeleton count={6} />
+          <PanelSkeleton rows={6} />
+        </>
       ) : (
         <>
           {ops ? (

@@ -1,7 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import ActionMenu from "../components/ActionMenu";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { PanelSkeleton } from "../components/Loading";
+import { InlineLoading, LoadingButton, RateTableSkeleton, Refreshable, Spinner } from "../components/Loading";
+import { useLoadMode } from "../hooks/useAsyncLoad";
 import SideDrawer from "../components/SideDrawer";
 import {
   createRate,
@@ -77,7 +79,7 @@ export default function RatesPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { loading, refreshing, begin, end } = useLoadMode();
   const [saving, setSaving] = useState(false);
   const [pendingRateConfirm, setPendingRateConfirm] = useState<{
     title: string;
@@ -184,7 +186,7 @@ export default function RatesPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    const generation = begin();
     void refresh()
       .catch((err) => {
         if (!cancelled) {
@@ -192,12 +194,12 @@ export default function RatesPage() {
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) end(generation);
       });
     return () => {
       cancelled = true;
     };
-  }, [searchQ, filterCategory, showInactive, sort, page, pageSize]);
+  }, [searchQ, filterCategory, showInactive, sort, page, pageSize, begin, end]);
 
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const rangeEnd = total === 0 ? 0 : Math.min(page * pageSize, total);
@@ -332,53 +334,76 @@ export default function RatesPage() {
 
   if (!canManageRates) {
     return (
-      <section className="stack">
-        <div className="page-header">
-          <h1 className="page-title">Rates</h1>
-          <p className="page-lead">
-            Only users with rate administration permission can manage the rate
-            library.
-            {canManageSettings ? (
-              <>
-                {" "}
-                Company and commercial rules are in{" "}
-                <Link to="/settings">Settings</Link>.
-              </>
-            ) : null}
-          </p>
+      <section className="stack rates-page">
+        <div className="page-header rates-page-header">
+          <div className="rates-page-heading">
+            <h1 className="page-title">Rates</h1>
+            <p className="page-lead">
+              Only users with rate administration permission can manage the rate
+              library.
+              {canManageSettings ? (
+                <>
+                  {" "}
+                  Company and commercial rules are in{" "}
+                  <Link to="/settings">Settings</Link>.
+                </>
+              ) : null}
+            </p>
+          </div>
         </div>
         <div className="error-banner">You do not have permission to view this page.</div>
       </section>
     );
   }
 
-  if (loading) {
-    return (
-      <section className="stack" aria-busy="true" aria-live="polite">
-        <div className="page-header">
-          <h1 className="page-title">Rates</h1>
-          <p className="page-lead">Loading rate library…</p>
-        </div>
-        <PanelSkeleton rows={8} />
-      </section>
-    );
-  }
-
   return (
-    <section className="stack">
-      <div className="page-header">
-        <h1 className="page-title">Rates</h1>
-        <p className="page-lead">
-          Maintain materials, labour, packages, travel, waste, and preliminaries
-          costs. Cost changes are versioned with reason and effective date.
-          {canManageSettings ? (
-            <>
-              {" "}
-              Company profile and commercial rules are in{" "}
-              <Link to="/settings">Settings</Link>.
-            </>
-          ) : null}
-        </p>
+    <section className="stack rates-page">
+      <div className="page-header rates-page-header">
+        <div className="rates-page-heading">
+          <h1 className="page-title">Rates</h1>
+          <p className="page-lead">
+            Maintain materials, labour, packages, travel, waste, and
+            preliminaries costs. Changes are versioned with reason and effective
+            date.
+            {canManageSettings ? (
+              <>
+                {" "}
+                Company profile and commercial rules live in{" "}
+                <Link to="/settings">Settings</Link>.
+              </>
+            ) : null}
+          </p>
+        </div>
+        <div className="rates-page-actions">
+          <label className={`btn btn-secondary${saving ? " is-loading" : ""}`} style={{ cursor: saving ? "wait" : "pointer" }}>
+            {saving ? (
+              <>
+                <Spinner size="sm" className="btn-spinner" label="Importing" />
+                Importing…
+              </>
+            ) : (
+              "Import CSV"
+            )}
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              hidden
+              disabled={saving}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (file) void importRatesCsv(file);
+              }}
+            />
+          </label>
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => setDrawer({ mode: "add" })}
+          >
+            Add rate
+          </button>
+        </div>
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
@@ -388,40 +413,22 @@ export default function RatesPage() {
           <div className="panel stack rate-table-panel">
             <div className="rate-table-header">
               <div>
-                <h2 className="panel-title" style={{ margin: 0 }}>
-                  Rate library
-                </h2>
+                <h2 className="panel-title rate-library-title">Rate library</h2>
                 <p className="muted rate-table-lead">
-                  {total} rate{total === 1 ? "" : "s"} across{" "}
-                  {categoryOptions.length} categories. CSV import upserts by
-                  code (creates or updates). Columns: code, name, category,
-                  cost_per_unit (optional: unit, waste_percent, notes).
+                  {loading
+                    ? "Loading rate library…"
+                    : `${total} rate${total === 1 ? "" : "s"} across ${
+                        categoryOptions.length
+                      } categor${categoryOptions.length === 1 ? "y" : "ies"}. CSV import upserts by code.`}
                 </p>
               </div>
               <div className="rate-table-header-actions">
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  onClick={() => setDrawer({ mode: "add" })}
-                >
-                  Add rate
-                </button>
-                <label className="btn btn-secondary" style={{ cursor: "pointer" }}>
-                  Import CSV
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    hidden
-                    disabled={saving}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (file) void importRatesCsv(file);
-                    }}
-                  />
-                </label>
                 {hasFilters ? (
-                  <button className="btn btn-secondary" type="button" onClick={resetFilters}>
+                  <button
+                    className="btn btn-ghost"
+                    type="button"
+                    onClick={resetFilters}
+                  >
                     Clear filters
                   </button>
                 ) : null}
@@ -430,7 +437,7 @@ export default function RatesPage() {
 
             <div className="rate-table-toolbar row row-align-end">
               <div className="field rate-search-field">
-                <label htmlFor="rate-search-q">Search rates</label>
+                <label htmlFor="rate-search-q">Search</label>
                 <input
                   id="rate-search-q"
                   type="search"
@@ -475,23 +482,6 @@ export default function RatesPage() {
                   ))}
                 </select>
               </div>
-              <div className="field">
-                <label htmlFor="rate-page-size">Per page</label>
-                <select
-                  id="rate-page-size"
-                  value={pageSize}
-                  onChange={(event) => {
-                    setPageSize(Number(event.target.value));
-                    setPage(1);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <label className="check-line rate-inactive-toggle">
                 <input
                   type="checkbox"
@@ -505,38 +495,14 @@ export default function RatesPage() {
               </label>
             </div>
 
-            <div className="rate-results-bar">
-              <p className="muted rate-results-summary">
-                {total === 0
-                  ? "No rates match the current filters."
-                  : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
-              </p>
-              {totalPages > 1 ? (
-                <div className="pagination" aria-label="Rate pagination">
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={!hasPrev}
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  >
-                    Previous
-                  </button>
-                  <span className="pagination-status">
-                    Page {page} of {totalPages}
-                  </span>
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    disabled={!hasNext}
-                    onClick={() => setPage((current) => current + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="rate-table-wrap">
+            {loading ? (
+              <RateTableSkeleton count={8} />
+            ) : (
+            <Refreshable
+              refreshing={refreshing}
+              label="Updating rates…"
+              className="rate-table-wrap"
+            >
               <table className="rate-table">
                 <thead>
                   <tr>
@@ -599,20 +565,25 @@ export default function RatesPage() {
                           >
                             Edit
                           </button>
-                          <button
-                            className="btn btn-secondary btn-compact"
-                            type="button"
-                            onClick={() => void openHistory(rate)}
-                          >
-                            History
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-compact"
-                            type="button"
-                            onClick={() => requestToggleActive(rate)}
-                          >
-                            {rate.active ? "Deactivate" : "Activate"}
-                          </button>
+                          <ActionMenu
+                            compact
+                            label="More"
+                            items={[
+                              {
+                                id: "history",
+                                label: "Cost history",
+                                onClick: () => {
+                                  void openHistory(rate);
+                                },
+                              },
+                              {
+                                id: "toggle",
+                                label: rate.active ? "Deactivate" : "Activate",
+                                tone: rate.active ? "danger" : "default",
+                                onClick: () => requestToggleActive(rate),
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -620,7 +591,7 @@ export default function RatesPage() {
                 </tbody>
               </table>
               {!rates.length ? (
-                <div className="empty-state estimates-table-empty">
+                <div className="empty-state estimates-table-empty rate-table-empty">
                   <strong>
                     {hasFilters ? "No rates match these filters" : "No rates yet"}
                   </strong>
@@ -632,7 +603,7 @@ export default function RatesPage() {
                   <div className="step-actions" style={{ justifyContent: "center" }}>
                     {hasFilters ? (
                       <button
-                        className="btn btn-secondary"
+                        className="btn btn-ghost"
                         type="button"
                         onClick={resetFilters}
                       >
@@ -650,30 +621,59 @@ export default function RatesPage() {
                   </div>
                 </div>
               ) : null}
-            </div>
+            </Refreshable>
+            )}
 
-            {totalPages > 1 ? (
-              <div className="pagination pagination-footer" aria-label="Rate pagination footer">
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={!hasPrev}
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                >
-                  Previous
-                </button>
-                <span className="pagination-status">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={!hasNext}
-                  onClick={() => setPage((current) => current + 1)}
-                >
-                  Next
-                </button>
+            {!loading ? (
+            <div className="rate-results-bar" aria-label="Rate table footer">
+              <p className="muted rate-results-summary">
+                {total === 0
+                  ? "No rates match the current filters."
+                  : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
+              </p>
+              <div className="rate-results-controls">
+                <div className="field rate-page-size-field">
+                  <label htmlFor="rate-page-size">Per page</label>
+                  <select
+                    id="rate-page-size"
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {totalPages > 1 ? (
+                  <div className="pagination" aria-label="Rate pagination">
+                    <button
+                      className="btn btn-secondary btn-compact"
+                      type="button"
+                      disabled={!hasPrev || refreshing}
+                      onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    >
+                      Previous
+                    </button>
+                    <span className="pagination-status">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      className="btn btn-secondary btn-compact"
+                      type="button"
+                      disabled={!hasNext || refreshing}
+                      onClick={() => setPage((current) => current + 1)}
+                    >
+                      Next
+                    </button>
+                  </div>
+                ) : null}
               </div>
+            </div>
             ) : null}
           </div>
         </>
@@ -758,12 +758,17 @@ export default function RatesPage() {
               <input id="drawer-notes" name="notes" />
             </div>
             <div className="side-drawer-actions">
-              <button className="btn btn-secondary" type="button" onClick={closeDrawer}>
+              <button className="btn btn-ghost" type="button" onClick={closeDrawer}>
                 Cancel
               </button>
-              <button className="btn btn-primary" type="submit" disabled={saving}>
+              <LoadingButton
+                className="btn btn-primary"
+                type="submit"
+                loading={saving}
+                loadingText="Adding…"
+              >
                 Add rate
-              </button>
+              </LoadingButton>
             </div>
           </form>
         ) : null}
@@ -852,12 +857,17 @@ export default function RatesPage() {
               Active
             </label>
             <div className="side-drawer-actions">
-              <button className="btn btn-secondary" type="button" onClick={closeDrawer}>
+              <button className="btn btn-ghost" type="button" onClick={closeDrawer}>
                 Cancel
               </button>
-              <button className="btn btn-primary" type="submit" disabled={saving}>
+              <LoadingButton
+                className="btn btn-primary"
+                type="submit"
+                loading={saving}
+                loadingText="Saving…"
+              >
                 Save changes
-              </button>
+              </LoadingButton>
             </div>
           </form>
         ) : null}
@@ -865,7 +875,7 @@ export default function RatesPage() {
         {drawer?.mode === "history" ? (
           <div className="stack">
             {historyLoading ? (
-              <p className="muted">Loading history…</p>
+              <InlineLoading label="Loading cost history…" />
             ) : historyRows.length === 0 ? (
               <p className="muted">No cost versions recorded yet for this rate.</p>
             ) : (

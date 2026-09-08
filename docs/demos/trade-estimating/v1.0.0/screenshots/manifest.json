@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-07T22:16:55.889Z",
-  "base_url": "http://localhost:5174",
+  "generated_at": "2026-09-08T15:07:03.366Z",
+  "base_url": "http://127.0.0.1:5173",
   "viewport": {
     "width": 1440,
     "height": 900,
@@ -12,11 +12,18 @@
     "02-estimates-dashboard.png",
     "03-estimates-advanced-filters.png",
     "05-customers.png",
-    "06-rates-company-and-settings.png",
-    "07-rates-add-form.png",
+    "05b-customers-add-drawer.png",
+    "05c-customer-detail.png",
+    "05d-customer-sites.png",
+    "05e-reports.png",
+    "05f-customer-surveys.png",
+    "05h-customer-estimates.png",
+    "06-rates-library.png",
+    "07-rates-add-drawer.png",
     "08-rates-cost-history.png",
+    "08b-settings.png",
     "09-admin-backups.png",
-    "10-estimate-new-customer.png",
+    "10-estimate-new.png",
     "11-estimate-editor-overview.png",
     "12-estimate-customer.png",
     "13-estimate-scope.png",
@@ -25,8 +32,9 @@
     "16-estimate-quotation.png",
     "17-estimate-actuals.png",
     "18-estimate-lifecycle-actions.png",
-    "18b-estimate-marked-quoted.png",
+    "18a-estimate-more-menu.png",
     "19-estimate-quotation-detail.png",
-    "20-estimate-actuals-detail.png"
+    "20-estimate-actuals-detail.png",
+    "21-user-menu-field-mode.png"
   ]
 }

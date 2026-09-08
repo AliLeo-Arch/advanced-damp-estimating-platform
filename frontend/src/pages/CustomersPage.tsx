@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { EstimateListSkeleton, LoadingButton } from "../components/Loading";
+import { CustomerTableSkeleton, LoadingButton } from "../components/Loading";
 import SideDrawer from "../components/SideDrawer";
 import { createCustomer, Customer, listCustomers } from "../api";
 
@@ -141,7 +141,7 @@ export default function CustomersPage() {
         </div>
 
         {loading ? (
-          <EstimateListSkeleton count={5} />
+          <CustomerTableSkeleton count={6} />
         ) : filtered.length === 0 ? (
           <div className="empty-state estimates-table-empty">
             <strong>
@@ -165,7 +165,7 @@ export default function CustomersPage() {
                 </button>
               ) : (
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-ghost"
                   type="button"
                   onClick={() => {
                     setDraftQ("");
@@ -271,7 +271,7 @@ export default function CustomersPage() {
           </div>
           <div className="side-drawer-actions">
             <button
-              className="btn btn-secondary"
+              className="btn btn-ghost"
               type="button"
               onClick={() => setAddOpen(false)}
             >

@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  DetailSkeleton,
   InlineLoading,
   LoadingButton,
-  PanelSkeleton,
 } from "../components/Loading";
 import SideDrawer from "../components/SideDrawer";
 import StatusPill from "../components/StatusPill";
@@ -229,15 +229,7 @@ export default function CustomerDetailPage() {
   }
 
   if (loading) {
-    return (
-      <section className="stack" aria-busy="true" aria-live="polite">
-        <div className="page-header">
-          <h1 className="page-title">Customer</h1>
-          <p className="page-lead">Loading customer…</p>
-        </div>
-        <PanelSkeleton rows={6} />
-      </section>
-    );
+    return <DetailSkeleton />;
   }
 
   if (!customer) {
@@ -549,7 +541,7 @@ export default function CustomerDetailPage() {
           </div>
           <div className="side-drawer-actions">
             <button
-              className="btn btn-secondary"
+              className="btn btn-ghost"
               type="button"
               onClick={() => setDrawer(null)}
             >
@@ -620,7 +612,7 @@ export default function CustomerDetailPage() {
           </div>
           <div className="side-drawer-actions">
             <button
-              className="btn btn-secondary"
+              className="btn btn-ghost"
               type="button"
               onClick={() => setDrawer(null)}
             >

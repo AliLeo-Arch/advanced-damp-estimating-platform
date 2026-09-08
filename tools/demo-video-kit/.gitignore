@@ -1,0 +1,5 @@
+node_modules/
+output/
+*.webm
+*.mp4
+.DS_Store

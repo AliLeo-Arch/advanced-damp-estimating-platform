@@ -12,12 +12,14 @@ type ActionMenuProps = {
   label?: string;
   items: ActionMenuItem[];
   disabled?: boolean;
+  compact?: boolean;
 };
 
 export default function ActionMenu({
   label = "More",
   items,
   disabled = false,
+  compact = false,
 }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -44,9 +46,9 @@ export default function ActionMenu({
   if (!items.length) return null;
 
   return (
-    <div className="action-menu" ref={rootRef}>
+    <div className={`action-menu${open ? " is-open" : ""}`} ref={rootRef}>
       <button
-        className="btn btn-secondary"
+        className={`btn btn-secondary${compact ? " btn-compact" : ""}`}
         type="button"
         disabled={disabled}
         aria-haspopup="menu"

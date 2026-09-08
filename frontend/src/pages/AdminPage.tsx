@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import ConfirmDialog from "../components/ConfirmDialog";
 import {
-  EstimateListSkeleton,
+  BackupTableSkeleton,
   LoadingButton,
   PanelSkeleton,
 } from "../components/Loading";
@@ -41,7 +41,10 @@ function backupFreshness(iso: string | null | undefined): {
   tone: "is-success" | "is-warning" | "is-danger";
 } {
   if (!iso) {
-    return { label: "No backup yet — create one before live work", tone: "is-danger" };
+    return {
+      label: "No backup yet — create one before live work",
+      tone: "is-danger",
+    };
   }
   const ageHours = (Date.now() - new Date(iso).getTime()) / 3_600_000;
   if (Number.isNaN(ageHours)) {
@@ -77,6 +80,10 @@ export default function AdminPage() {
     [latestBackup],
   );
   const retentionKeep = system?.backup_retention_keep ?? 30;
+  const cadenceLabel =
+    system?.backup_recommended_cadence === "daily"
+      ? "Daily"
+      : system?.backup_recommended_cadence || "Daily";
 
   async function refresh() {
     const [rows, info] = await Promise.all([listBackups(), getSystemInfo()]);
@@ -154,160 +161,215 @@ export default function AdminPage() {
 
   if (!canBackup) {
     return (
-      <section className="stack">
-        <div className="page-header">
-          <h1 className="page-title">Admin</h1>
-          <p className="page-lead">You do not have permission to manage backups.</p>
+      <section className="stack admin-page">
+        <div className="page-header admin-page-header">
+          <div className="admin-page-heading">
+            <h1 className="page-title">Admin</h1>
+            <p className="page-lead">
+              You do not have permission to manage backups.
+            </p>
+          </div>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="stack">
-      <div className="page-header">
-        <h1 className="page-title">Admin</h1>
-        <p className="page-lead">
-          Backup status, system health, and restore controls for this
-          installation.
-        </p>
+    <section className="stack admin-page">
+      <div className="page-header admin-page-header">
+        <div className="admin-page-heading">
+          <h1 className="page-title">Admin</h1>
+          <p className="page-lead">
+            Backup status, system health, and restore controls for this
+            installation.
+          </p>
+        </div>
+        <div className="admin-page-actions">
+          <LoadingButton
+            className="btn btn-primary"
+            type="button"
+            loading={busy}
+            loadingText="Creating backup…"
+            disabled={loading}
+            onClick={() => void handleCreateBackup()}
+          >
+            {backups.length === 0 ? "Create first backup" : "Create backup"}
+          </LoadingButton>
+        </div>
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
       {message ? <div className="info-banner">{message}</div> : null}
 
-      {system ? (
-        <div className="panel">
-          <h2 className="panel-title">Backup status</h2>
-          <p className={`backup-freshness ${freshness.tone}`} role="status">
-            {freshness.label}
-          </p>
-          <ul className="meta-list">
-            <li>
-              <span>Last successful backup</span>
-              <strong>
-                {latestBackup
-                  ? formatWhen(latestBackup.created_at)
-                  : "None yet"}
+      {loading && !system ? (
+        <PanelSkeleton rows={4} />
+      ) : system ? (
+        <section className="panel admin-status-panel">
+          <header className="admin-section-header">
+            <div>
+              <h2 className="panel-title admin-section-title">System status</h2>
+              <p className={`backup-freshness ${freshness.tone}`} role="status">
+                {freshness.label}
+              </p>
+            </div>
+          </header>
+
+          <div className="admin-stat-grid" aria-label="Backup summary">
+            <div className="admin-stat-card">
+              <span className="admin-stat-label">Stored backups</span>
+              <strong className="admin-stat-value">{system.backup_count}</strong>
+            </div>
+            <div className="admin-stat-card">
+              <span className="admin-stat-label">Retention</span>
+              <strong className="admin-stat-value">Latest {retentionKeep}</strong>
+            </div>
+            <div className="admin-stat-card">
+              <span className="admin-stat-label">Cadence</span>
+              <strong className="admin-stat-value">{cadenceLabel}</strong>
+            </div>
+            <div className="admin-stat-card">
+              <span className="admin-stat-label">Database</span>
+              <strong
+                className={`admin-stat-value ${
+                  system.database_ok ? "is-ok" : "is-bad"
+                }`}
+              >
+                {system.database_ok ? "Connected" : "Unavailable"}
               </strong>
-            </li>
-            <li>
-              <span>Stored backups</span>
-              <strong>{system.backup_count}</strong>
-            </li>
-            <li>
-              <span>Retention</span>
-              <strong>Keep latest {retentionKeep}</strong>
-            </li>
-            <li>
-              <span>Recommended cadence</span>
-              <strong>
-                {system.backup_recommended_cadence === "daily"
-                  ? "Daily"
-                  : system.backup_recommended_cadence || "Daily"}
-              </strong>
-            </li>
-            <li>
-              <span>Latest size</span>
-              <strong>
+            </div>
+          </div>
+
+          <dl className="admin-meta-grid">
+            <div className="admin-meta-item">
+              <dt>Last successful backup</dt>
+              <dd>
+                {latestBackup ? formatWhen(latestBackup.created_at) : "None yet"}
+              </dd>
+            </div>
+            <div className="admin-meta-item">
+              <dt>Latest size</dt>
+              <dd>
                 {latestBackup ? formatBytes(latestBackup.size_bytes) : "—"}
-              </strong>
-            </li>
-            <li>
-              <span>Database</span>
-              <strong>{system.database_ok ? "Connected" : "Unavailable"}</strong>
-            </li>
-            <li>
-              <span>Application</span>
-              <strong>
-                {system.app} · v{system.version}
-              </strong>
-            </li>
-            <li>
-              <span>Environment</span>
-              <strong>{formatEnvironment(system.environment)}</strong>
-            </li>
-          </ul>
+              </dd>
+            </div>
+            <div className="admin-meta-item">
+              <dt>Environment</dt>
+              <dd>{formatEnvironment(system.environment)}</dd>
+            </div>
+            <div className="admin-meta-item">
+              <dt>Application</dt>
+              <dd title={`${system.app} · v${system.version}`}>
+                {system.app}
+                <span className="admin-meta-version">v{system.version}</span>
+              </dd>
+            </div>
+          </dl>
+
           <p className="backup-schedule-note">
             Create a backup at least daily during active quoting, and after
             significant rate or settings changes. Older copies beyond the
             retention limit are pruned automatically when a new backup is
             created.
           </p>
-        </div>
+        </section>
       ) : null}
 
-      <div className="toolbar">
-        <LoadingButton
-          className="btn btn-primary"
-          type="button"
-          loading={busy}
-          loadingText="Creating backup…"
-          disabled={loading}
-          onClick={() => void handleCreateBackup()}
-        >
-          {backups.length === 0 ? "Create first backup" : "Create backup now"}
-        </LoadingButton>
-      </div>
+      <section className="panel admin-library-panel">
+        <header className="admin-section-header admin-library-header">
+          <div>
+            <h2 className="panel-title admin-section-title">Backup library</h2>
+            <p className="muted admin-section-lead">
+              Download a copy for offsite storage, or restore to replace current
+              data.
+            </p>
+          </div>
+        </header>
 
-      {loading ? (
-        <>
-          <PanelSkeleton rows={4} />
-          <EstimateListSkeleton count={3} />
-        </>
-      ) : backups.length === 0 ? (
-        <div className="panel empty-state">
-          <strong>No backups have been created yet</strong>
-          <p className="muted" style={{ margin: "0.45rem 0 0" }}>
-            Create a backup before using this system for live commercial work.
-          </p>
-        </div>
-      ) : (
-        <div className="panel variance-table-wrap">
-          <table className="variance-table">
-            <thead>
-              <tr>
-                <th>Created</th>
-                <th>Size</th>
-                <th>File</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {backups.map((row) => (
-                <tr key={row.filename}>
-                  <td>{formatWhen(row.created_at)}</td>
-                  <td>{formatBytes(row.size_bytes)}</td>
-                  <td>{row.filename}</td>
-                  <td>
-                    <div className="inline-actions">
-                      <button
-                        className="btn btn-secondary"
-                        type="button"
-                        onClick={() => void handleDownload(row.filename)}
-                      >
-                        Download
-                      </button>
-                      <button
-                        className="btn btn-secondary"
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setRestoreConfirm(row)}
-                      >
-                        Restore
-                      </button>                    </div>
-                  </td>
+        {loading ? (
+          <div className="admin-library-body">
+            <BackupTableSkeleton count={4} />
+          </div>
+        ) : backups.length === 0 ? (
+          <div className="empty-state admin-empty">
+            <strong>No backups yet</strong>
+            <p>
+              Create a backup before using this system for live commercial work.
+            </p>
+            <div className="step-actions" style={{ justifyContent: "center" }}>
+              <LoadingButton
+                className="btn btn-primary"
+                type="button"
+                loading={busy}
+                loadingText="Creating backup…"
+                onClick={() => void handleCreateBackup()}
+              >
+                Create first backup
+              </LoadingButton>
+            </div>
+          </div>
+        ) : (
+          <div className="admin-table-wrap">
+            <table className="admin-backup-table">
+              <thead>
+                <tr>
+                  <th scope="col">Created</th>
+                  <th scope="col" className="is-num">
+                    Size
+                  </th>
+                  <th scope="col">File</th>
+                  <th scope="col" className="is-actions">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {backups.map((row, index) => (
+                  <tr key={row.filename} className={index === 0 ? "is-latest" : undefined}>
+                    <td data-label="Created">
+                      <div className="admin-backup-when">
+                        {formatWhen(row.created_at)}
+                        {index === 0 ? (
+                          <span className="admin-latest-pill">Latest</span>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td data-label="Size" className="is-num">
+                      {formatBytes(row.size_bytes)}
+                    </td>
+                    <td data-label="File">
+                      <code className="admin-backup-file">{row.filename}</code>
+                    </td>
+                    <td data-label="Actions" className="is-actions">
+                      <div className="admin-row-actions">
+                        <button
+                          className="btn btn-secondary btn-compact"
+                          type="button"
+                          onClick={() => void handleDownload(row.filename)}
+                        >
+                          Download
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-compact"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setRestoreConfirm(row)}
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      <div className="panel muted">
-        Restoring a backup replaces current application data with the selected
-        backup. A safety copy is created automatically before restore.
-      </div>
+        <p className="admin-restore-note">
+          Restoring a backup replaces current application data with the selected
+          backup. A safety copy is created automatically before restore.
+        </p>
+      </section>
 
       <ConfirmDialog
         open={Boolean(restoreConfirm)}

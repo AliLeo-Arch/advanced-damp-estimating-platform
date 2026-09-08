@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { Spinner } from "./Loading";
 
 export type ConfirmDialogProps = {
   open: boolean;
@@ -94,7 +95,7 @@ export default function ConfirmDialog({
         </p>
         <div className="confirm-dialog-actions">
           <button
-            className="btn btn-secondary"
+            className="btn btn-ghost"
             type="button"
             disabled={busy}
             onClick={onCancel}
@@ -103,12 +104,20 @@ export default function ConfirmDialog({
           </button>
           <button
             ref={confirmRef}
-            className={`btn ${tone === "danger" ? "btn-danger" : "btn-primary"}`}
+            className={`btn ${tone === "danger" ? "btn-danger" : "btn-primary"}${busy ? " is-loading" : ""}`}
             type="button"
             disabled={busy}
             onClick={onConfirm}
+            aria-busy={busy || undefined}
           >
-            {busy ? "Working…" : confirmLabel}
+            {busy ? (
+              <>
+                <Spinner size="sm" className="btn-spinner" label="Working" />
+                Working…
+              </>
+            ) : (
+              confirmLabel
+            )}
           </button>
         </div>
       </div>

@@ -188,7 +188,7 @@ export default function ActualCostCategory({
                 Add line
               </button>
               <button
-                className="btn btn-secondary btn-compact"
+                className="btn btn-ghost btn-compact"
                 type="button"
                 disabled={busy}
                 onClick={() => {

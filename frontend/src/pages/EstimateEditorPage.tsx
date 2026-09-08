@@ -5,7 +5,7 @@ import ActionMenu, { ActionMenuItem } from "../components/ActionMenu";
 import ActualCostCategory, {
   ActualCostCategoryKey,
 } from "../components/ActualCostCategory";
-import { EditorSkeleton } from "../components/Loading";
+import { EditorSkeleton, LoadingButton } from "../components/Loading";
 import StatusPill from "../components/StatusPill";
 import {
   approveEstimate,
@@ -1672,24 +1672,26 @@ export default function EstimateEditorPage() {
           </div>
           <div className="estimate-command-actions">
             {!locked && isDirty ? (
-              <button
+              <LoadingButton
                 className="btn btn-secondary"
                 type="button"
-                disabled={saving}
+                loading={saving}
+                loadingText="Saving…"
                 onClick={() => void onExplicitSave()}
               >
-                {saving ? "Saving…" : "Save"}
-              </button>
+                Save
+              </LoadingButton>
             ) : null}
             {estimate && primaryCommand ? (
-              <button
+              <LoadingButton
                 className="btn btn-primary"
                 type="button"
+                loading={saving}
                 disabled={primaryCommand.disabled}
                 onClick={primaryCommand.onClick}
               >
                 {primaryCommand.label}
-              </button>
+              </LoadingButton>
             ) : null}
             {estimate ? (
               <ActionMenu items={moreCommandItems} disabled={saving} />
@@ -1870,7 +1872,7 @@ export default function EstimateEditorPage() {
           </div>
           <div className="step-actions">
             <button
-              className="btn btn-secondary"
+              className="btn btn-ghost"
               type="button"
               onClick={() => setShowAcceptForm(false)}
             >
@@ -2105,14 +2107,15 @@ export default function EstimateEditorPage() {
                     />
                   </div>
                 </div>
-                <button
+                <LoadingButton
                   className="btn btn-secondary"
                   type="button"
-                  disabled={crmBusy}
+                  loading={crmBusy}
+                  loadingText="Saving…"
                   onClick={(event) => void onCreateCrmCustomer(event)}
                 >
-                  {crmBusy ? "Saving…" : "Save customer"}
-                </button>
+                  Save customer
+                </LoadingButton>
               </div>
             ) : null}
 
@@ -2270,14 +2273,15 @@ export default function EstimateEditorPage() {
                     />
                   </div>
                 </div>
-                <button
+                <LoadingButton
                   className="btn btn-secondary"
                   type="button"
-                  disabled={crmBusy}
+                  loading={crmBusy}
+                  loadingText="Saving…"
                   onClick={(event) => void onCreateCrmSite(event)}
                 >
-                  {crmBusy ? "Saving…" : "Save site"}
-                </button>
+                  Save site
+                </LoadingButton>
               </div>
             ) : null}
 
@@ -2336,13 +2340,9 @@ export default function EstimateEditorPage() {
             <Link className="btn btn-secondary" to="/">
               Back to estimates
             </Link>
-            <button className="btn btn-primary" disabled={saving || crmBusy}>
-              {saving
-                ? "Saving…"
-                : locked
-                  ? "View work scope"
-                  : "Continue to work scope"}
-            </button>
+            <LoadingButton className="btn btn-primary" disabled={saving || crmBusy} loading={saving || crmBusy} loadingText="Saving…">
+              {locked ? "View work scope" : "Continue to work scope"}
+            </LoadingButton>
           </div>
         </form>
       ) : null}
@@ -2373,7 +2373,7 @@ export default function EstimateEditorPage() {
               <strong>No work types match</strong>
               <p className="muted">Try a different search term.</p>
               <button
-                className="btn btn-secondary"
+                className="btn btn-ghost"
                 type="button"
                 onClick={() => setWorkTypeSearch("")}
               >
@@ -2913,10 +2913,11 @@ export default function EstimateEditorPage() {
             >
               Back
             </button>
-            <button
+            <LoadingButton
               className="btn btn-primary"
               type="button"
-              disabled={saving}
+              loading={saving}
+              loadingText={locked ? "Opening…" : "Calculating…"}
               onClick={() => {
                 if (locked) {
                   setStep("pricing");
@@ -2925,12 +2926,8 @@ export default function EstimateEditorPage() {
                 void saveAndPrice("pricing");
               }}
             >
-              {saving
-                ? "Calculating…"
-                : locked
-                  ? "View price review"
-                  : "Calculate price"}
-            </button>
+              {locked ? "View price review" : "Calculate price"}
+            </LoadingButton>
           </div>
         </div>
       ) : null}
@@ -3209,10 +3206,11 @@ export default function EstimateEditorPage() {
             >
               Back
             </button>
-            <button
+            <LoadingButton
               className="btn btn-primary"
               type="button"
-              disabled={saving}
+              loading={saving}
+              loadingText={locked ? "Opening…" : "Preparing…"}
               onClick={() => {
                 if (locked) {
                   setStep("quotation");
@@ -3221,12 +3219,8 @@ export default function EstimateEditorPage() {
                 void saveAndPrice("quotation", "ready_to_quote");
               }}
             >
-              {saving
-                ? "Preparing…"
-                : locked
-                  ? "View quotation"
-                  : "Generate quotation"}
-            </button>
+              {locked ? "View quotation" : "Generate quotation"}
+            </LoadingButton>
           </div>
         </div>
       ) : null}
@@ -3567,9 +3561,9 @@ export default function EstimateEditorPage() {
                   />
                 </div>
                 <div className="step-actions">
-                  <button className="btn btn-secondary" type="submit" disabled={saving}>
-                    {saving ? "Saving…" : "Save draft actuals"}
-                  </button>
+                  <LoadingButton className="btn btn-secondary" type="submit" loading={saving} loadingText="Saving…">
+                    Save draft actuals
+                  </LoadingButton>
                   {jobActuals?.marked_complete ? (
                     <button
                       className="btn btn-secondary"
@@ -3580,18 +3574,19 @@ export default function EstimateEditorPage() {
                       Reopen actuals
                     </button>
                   ) : (
-                    <button
+                    <LoadingButton
                       className="btn btn-primary"
                       type="button"
+                      loading={saving}
+                      loadingText="Completing…"
                       disabled={
-                        saving ||
                         (jobActuals?.categories_entered || 0) <
-                          (jobActuals?.categories_total || 6)
+                        (jobActuals?.categories_total || 6)
                       }
                       onClick={() => void onMarkActualsComplete()}
                     >
                       Mark actuals complete
-                    </button>
+                    </LoadingButton>
                   )}
                 </div>
                 {jobActuals &&

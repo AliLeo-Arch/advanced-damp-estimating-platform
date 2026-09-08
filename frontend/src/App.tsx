@@ -9,7 +9,7 @@ import {
 } from "react-router-dom";
 import { AuthUser, clearSession, fetchSession, getStoredUser } from "./auth";
 import { CompanyProfile, getCompanyProfile } from "./api";
-import { LoadingState } from "./components/Loading";
+import { AppBootScreen } from "./components/Loading";
 import UserMenu from "./components/UserMenu";
 import CustomersPage from "./pages/CustomersPage";
 import CustomerDetailPage from "./pages/CustomerDetailPage";
@@ -63,6 +63,17 @@ function canManageSettings(user: AuthUser | null) {
 
 function canAdmin(user: AuthUser | null) {
   return Boolean(user?.permissions?.includes("backup"));
+}
+
+function isNavActive(pathname: string, to: string) {
+  if (to === "/") {
+    return pathname === "/" || pathname.startsWith("/estimates");
+  }
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+function navLinkClass(pathname: string, to: string) {
+  return `nav-link${isNavActive(pathname, to) ? " is-active" : ""}`;
 }
 
 export default function App() {
@@ -121,11 +132,7 @@ export default function App() {
   }
 
   if (booting) {
-    return (
-      <div className="app-shell app-boot">
-        <LoadingState label="Starting Trade Estimating & Quoting…" />
-      </div>
-    );
+    return <AppBootScreen />;
   }
 
   return (
@@ -138,54 +145,103 @@ export default function App() {
         Skip to main content
       </a>
       <header className="app-header">
-        <Link to="/" className="brand" aria-label="Trade Estimating & Quoting home">
-          <img
-            className="brand-logo"
-            src="/brand/trade-estimating-mark.svg"
-            alt="Trade Estimating"
-          />
-          <span className="brand-text">
-            <span className="brand-mark">Trade Estimating</span>
-            <span className="brand-sub">Quoting</span>
-          </span>
-        </Link>
-
-        <nav className="app-nav app-nav-desktop" aria-label="Primary">
-          {user ? (
-            <>
-              <Link to="/">Estimates</Link>
-              <Link to="/customers">Customers</Link>
-              <Link to="/reports">Reports</Link>
-              {canManageRates(user) ? <Link to="/rates">Rates</Link> : null}
-              {canManageSettings(user) ? (
-                <Link to="/settings">Settings</Link>
-              ) : null}
-              {canAdmin(user) ? <Link to="/admin">Admin</Link> : null}
-              <UserMenu user={user} onSignOut={logout} />
-              <Link to="/estimates/new" className="nav-cta">
-                New estimate
-              </Link>
-            </>
-          ) : location.pathname === "/login" ? null : (
-            <Link to="/login" className="nav-cta">
-              Sign in
-            </Link>
-          )}
-        </nav>
-
-        {user || location.pathname !== "/login" ? (
-          <button
-            type="button"
-            className="menu-toggle"
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
+        <div className="app-header-inner">
+          <Link
+            to="/"
+            className="brand"
+            aria-label="Trade Estimating & Quoting home"
           >
-            <span className={`menu-toggle-bars ${menuOpen ? "is-open" : ""}`} />
-          </button>
-        ) : (
-          <span className="header-spacer" aria-hidden />
-        )}
+            <img
+              className="brand-logo"
+              src="/brand/trade-estimating-mark.svg"
+              alt=""
+            />
+            <span className="brand-text">
+              <span className="brand-mark">Trade Estimating</span>
+              <span className="brand-sub">Quoting</span>
+            </span>
+          </Link>
+
+          {user ? (
+            <nav className="app-nav app-nav-desktop" aria-label="Primary">
+              <div className="app-nav-links">
+                <Link className={navLinkClass(location.pathname, "/")} to="/">
+                  Estimates
+                </Link>
+                <Link
+                  className={navLinkClass(location.pathname, "/customers")}
+                  to="/customers"
+                >
+                  Customers
+                </Link>
+                <Link
+                  className={navLinkClass(location.pathname, "/reports")}
+                  to="/reports"
+                >
+                  Reports
+                </Link>
+                {canManageRates(user) || canManageSettings(user) || canAdmin(user) ? (
+                  <span className="app-nav-divider" aria-hidden />
+                ) : null}
+                {canManageRates(user) ? (
+                  <Link
+                    className={navLinkClass(location.pathname, "/rates")}
+                    to="/rates"
+                  >
+                    Rates
+                  </Link>
+                ) : null}
+                {canManageSettings(user) ? (
+                  <Link
+                    className={navLinkClass(location.pathname, "/settings")}
+                    to="/settings"
+                  >
+                    Settings
+                  </Link>
+                ) : null}
+                {canAdmin(user) ? (
+                  <Link
+                    className={navLinkClass(location.pathname, "/admin")}
+                    to="/admin"
+                  >
+                    Admin
+                  </Link>
+                ) : null}
+              </div>
+            </nav>
+          ) : null}
+
+          <div className="app-header-actions">
+            {user ? (
+              <>
+                <UserMenu user={user} onSignOut={logout} />
+                <Link to="/estimates/new" className="nav-cta">
+                  New estimate
+                </Link>
+              </>
+            ) : location.pathname === "/login" ? null : (
+              <Link to="/login" className="nav-cta">
+                Sign in
+              </Link>
+            )}
+
+            {user || location.pathname !== "/login" ? (
+              <button
+                type="button"
+                className="menu-toggle"
+                aria-label={menuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                <span
+                  className={`menu-toggle-bars ${menuOpen ? "is-open" : ""}`}
+                />
+              </button>
+            ) : (
+              <span className="header-spacer" aria-hidden />
+            )}
+          </div>
+        </div>
       </header>
 
       {menuOpen ? (
@@ -201,32 +257,58 @@ export default function App() {
               <>
                 <p className="mobile-drawer-user">
                   {user.full_name}
-                  <span>{user.role}</span>
+                  <span>{user.role.replaceAll("_", " ")}</span>
                 </p>
-                <Link to="/" onClick={() => setMenuOpen(false)}>
-                  Estimates
-                </Link>
-                <Link to="/customers" onClick={() => setMenuOpen(false)}>
-                  Customers
-                </Link>
-                <Link to="/reports" onClick={() => setMenuOpen(false)}>
-                  Reports
-                </Link>
-                {canManageRates(user) ? (
-                  <Link to="/rates" onClick={() => setMenuOpen(false)}>
-                    Rates
+                <div className="mobile-drawer-links">
+                  <Link
+                    className={navLinkClass(location.pathname, "/")}
+                    to="/"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Estimates
                   </Link>
-                ) : null}
-                {canManageSettings(user) ? (
-                  <Link to="/settings" onClick={() => setMenuOpen(false)}>
-                    Settings
+                  <Link
+                    className={navLinkClass(location.pathname, "/customers")}
+                    to="/customers"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Customers
                   </Link>
-                ) : null}
-                {canAdmin(user) ? (
-                  <Link to="/admin" onClick={() => setMenuOpen(false)}>
-                    Admin
+                  <Link
+                    className={navLinkClass(location.pathname, "/reports")}
+                    to="/reports"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Reports
                   </Link>
-                ) : null}
+                  {canManageRates(user) ? (
+                    <Link
+                      className={navLinkClass(location.pathname, "/rates")}
+                      to="/rates"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Rates
+                    </Link>
+                  ) : null}
+                  {canManageSettings(user) ? (
+                    <Link
+                      className={navLinkClass(location.pathname, "/settings")}
+                      to="/settings"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Settings
+                    </Link>
+                  ) : null}
+                  {canAdmin(user) ? (
+                    <Link
+                      className={navLinkClass(location.pathname, "/admin")}
+                      to="/admin"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Admin
+                    </Link>
+                  ) : null}
+                </div>
                 <Link
                   to="/estimates/new"
                   className="nav-cta"
@@ -234,7 +316,11 @@ export default function App() {
                 >
                   New estimate
                 </Link>
-                <button className="btn btn-secondary" type="button" onClick={logout}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={logout}
+                >
                   Sign out
                 </button>
               </>
