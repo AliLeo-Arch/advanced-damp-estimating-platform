@@ -17,6 +17,24 @@ COST_CATEGORY_FIELDS = (
     "other_actual",
 )
 
+ACTUAL_ENTRY_CATEGORIES = (
+    "materials",
+    "labour",
+    "waste",
+    "travel",
+    "prelims",
+    "other",
+)
+
+CATEGORY_TO_FIELD = {
+    "materials": "materials_actual",
+    "labour": "labour_actual",
+    "waste": "waste_actual",
+    "travel": "travel_actual",
+    "prelims": "prelims_actual",
+    "other": "other_actual",
+}
+
 
 @dataclass
 class CostLine:
@@ -115,8 +133,13 @@ def actuals_entry_status(view: _ActualsView) -> tuple[str, int, int]:
 
 
 def build_comparison(estimate: Estimate, actuals: EstimateActuals) -> ActualsComparison:
-    view = normalize_actuals_values(actuals)
+    return build_comparison_from_view(estimate, normalize_actuals_values(actuals))
 
+
+def build_comparison_from_view(
+    estimate: Estimate,
+    view: _ActualsView,
+) -> ActualsComparison:
     est_materials = round_money(estimate.materials_cost or 0)
     est_labour = round_money(estimate.labour_cost or 0)
     est_waste = round_money(estimate.waste_cost or 0)
@@ -274,3 +297,53 @@ def comparison_to_dict(comparison: ActualsComparison) -> dict[str, Any]:
         "categories_entered": comparison.categories_entered,
         "categories_total": comparison.categories_total,
     }
+
+
+def sync_category_totals_from_entries(
+    actuals: EstimateActuals,
+    entries: list[Any],
+) -> set[str]:
+    """
+    Roll detailed lines into category totals on the ORM row.
+    Returns the set of categories driven by line entries.
+    """
+    totals, driven = entry_category_totals(entries)
+    for category in driven:
+        setattr(actuals, CATEGORY_TO_FIELD[category], totals[category])
+    return driven
+
+
+def entry_category_totals(entries: list[Any]) -> tuple[dict[str, float], set[str]]:
+    totals: dict[str, float] = {key: 0.0 for key in ACTUAL_ENTRY_CATEGORIES}
+    driven: set[str] = set()
+    for entry in entries:
+        category = getattr(entry, "category", None)
+        if category not in CATEGORY_TO_FIELD:
+            continue
+        driven.add(category)
+        totals[category] = round_money(
+            totals[category] + float(getattr(entry, "amount", 0) or 0)
+        )
+    return totals, driven
+
+
+def view_with_entries(
+    actuals: EstimateActuals,
+    entries: list[Any],
+) -> tuple[_ActualsView, set[str]]:
+    """Read-only overlay of entry rollups for comparison/serialization."""
+    view = normalize_actuals_values(actuals)
+    totals, driven = entry_category_totals(entries)
+    data = {
+        "materials_actual": view.materials_actual,
+        "labour_actual": view.labour_actual,
+        "waste_actual": view.waste_actual,
+        "travel_actual": view.travel_actual,
+        "prelims_actual": view.prelims_actual,
+        "other_actual": view.other_actual,
+        "revenue_actual": view.revenue_actual,
+        "notes": view.notes,
+    }
+    for category in driven:
+        data[CATEGORY_TO_FIELD[category]] = totals[category]
+    return _ActualsView(**data), driven

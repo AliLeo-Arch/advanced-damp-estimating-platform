@@ -120,6 +120,67 @@ def test_partial_actuals_skip_definitive_margin():
     assert comparison.margin_value.entered is False
 
 
+def test_entry_totals_drive_category_and_comparison():
+    from app.actuals import build_comparison_from_view, view_with_entries
+    from app.models import EstimateActualEntry
+
+    estimate = _base_estimate()
+    actuals = EstimateActuals(
+        estimate_id=1,
+        materials_actual=None,
+        labour_actual=None,
+        waste_actual=None,
+        travel_actual=None,
+        prelims_actual=None,
+        other_actual=None,
+        revenue_actual=None,
+    )
+    entries = [
+        EstimateActualEntry(
+            estimate_id=1,
+            category="materials",
+            description="Membrane pack",
+            amount=250,
+        ),
+        EstimateActualEntry(
+            estimate_id=1,
+            category="materials",
+            description="Extra sealant",
+            amount=50,
+        ),
+        EstimateActualEntry(
+            estimate_id=1,
+            category="labour",
+            description="Two days",
+            amount=320,
+        ),
+    ]
+    view, driven = view_with_entries(actuals, entries)
+    assert driven == {"materials", "labour"}
+    assert view.materials_actual == 300.0
+    assert view.labour_actual == 320.0
+    comparison = build_comparison_from_view(estimate, view)
+    assert comparison.status == "partial"
+    assert comparison.materials.actual == 300.0
+    assert comparison.labour.actual == 320.0
+    assert comparison.total_cost.actual == 620.0
+    assert comparison.actual_margin_percent is None
+
+
+def test_sync_category_totals_from_entries_mutates_row():
+    from app.actuals import sync_category_totals_from_entries
+    from app.models import EstimateActualEntry
+
+    actuals = EstimateActuals(estimate_id=1)
+    entries = [
+        EstimateActualEntry(estimate_id=1, category="waste", amount=40),
+        EstimateActualEntry(estimate_id=1, category="waste", amount=15),
+    ]
+    driven = sync_category_totals_from_entries(actuals, entries)
+    assert driven == {"waste"}
+    assert actuals.waste_actual == 55.0
+
+
 def test_genuine_zero_other_cost_is_entered():
     estimate = _base_estimate()
     actuals = EstimateActuals(

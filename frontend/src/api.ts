@@ -440,6 +440,17 @@ export type ActualsComparisonRow = {
 
 export type ActualsEntryStatus = "not_started" | "partial" | "complete";
 
+export type ActualCostEntry = {
+  id: number;
+  estimate_id: number;
+  category: string;
+  description: string;
+  amount: number;
+  occurred_on: string;
+  supplier_ref: string;
+  sort_order: number;
+};
+
 export type JobActuals = {
   estimate_id: number;
   materials_actual: number | null;
@@ -453,6 +464,8 @@ export type JobActuals = {
   status: ActualsEntryStatus;
   categories_entered: number;
   categories_total: number;
+  entries: ActualCostEntry[];
+  entry_driven_categories: string[];
   comparison: {
     materials: ActualsComparisonRow;
     labour: ActualsComparisonRow;
@@ -545,6 +558,48 @@ export function updateJobActuals(
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export function createActualCostEntry(
+  estimateId: number,
+  payload: {
+    category: string;
+    description?: string;
+    amount: number;
+    occurred_on?: string;
+    supplier_ref?: string;
+  },
+) {
+  return request<JobActuals>(`/api/estimates/${estimateId}/actuals/entries`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateActualCostEntry(
+  estimateId: number,
+  entryId: number,
+  payload: {
+    description?: string;
+    amount?: number;
+    occurred_on?: string;
+    supplier_ref?: string;
+  },
+) {
+  return request<JobActuals>(
+    `/api/estimates/${estimateId}/actuals/entries/${entryId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function deleteActualCostEntry(estimateId: number, entryId: number) {
+  return request<JobActuals>(
+    `/api/estimates/${estimateId}/actuals/entries/${entryId}`,
+    { method: "DELETE" },
+  );
 }
 
 export function listWorkTypes() {

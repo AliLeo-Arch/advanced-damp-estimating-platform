@@ -224,6 +224,32 @@ class ActualsUpdate(BaseModel):
     notes: str = ""
 
 
+class ActualEntryCreate(BaseModel):
+    category: str
+    description: str = Field(default="", max_length=300)
+    amount: float = Field(ge=0)
+    occurred_on: str = Field(default="", max_length=20)
+    supplier_ref: str = Field(default="", max_length=120)
+
+
+class ActualEntryUpdate(BaseModel):
+    description: str | None = Field(default=None, max_length=300)
+    amount: float | None = Field(default=None, ge=0)
+    occurred_on: str | None = Field(default=None, max_length=20)
+    supplier_ref: str | None = Field(default=None, max_length=120)
+
+
+class ActualEntryRead(BaseModel):
+    id: int
+    estimate_id: int
+    category: str
+    description: str
+    amount: float
+    occurred_on: str = ""
+    supplier_ref: str = ""
+    sort_order: int = 0
+
+
 class ActualsRead(BaseModel):
     estimate_id: int
     materials_actual: float | None
@@ -237,6 +263,8 @@ class ActualsRead(BaseModel):
     status: str = "not_started"
     categories_entered: int = 0
     categories_total: int = 6
+    entries: list[ActualEntryRead] = []
+    entry_driven_categories: list[str] = []
     comparison: dict[str, Any]
 
 

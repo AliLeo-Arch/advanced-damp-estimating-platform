@@ -2,15 +2,20 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import ConfirmDialog from "../components/ConfirmDialog";
 import ActionMenu, { ActionMenuItem } from "../components/ActionMenu";
+import ActualCostCategory, {
+  ActualCostCategoryKey,
+} from "../components/ActualCostCategory";
 import { EditorSkeleton } from "../components/Loading";
 import StatusPill from "../components/StatusPill";
 import {
   approveEstimate,
+  createActualCostEntry,
   createCustomer,
   createEstimate,
   createSite,
   createSurvey,
   Customer,
+  deleteActualCostEntry,
   Estimate,
   EstimatePayload,
   formatMoney,
@@ -98,6 +103,19 @@ function moneyOrBlank(value: string): number | null {
 
 function actualFieldValue(value: number | null | undefined): string {
   return value == null ? "" : String(value);
+}
+
+function applyJobActualsToForm(row: JobActuals) {
+  return {
+    materials_actual: actualFieldValue(row.materials_actual),
+    labour_actual: actualFieldValue(row.labour_actual),
+    waste_actual: actualFieldValue(row.waste_actual),
+    travel_actual: actualFieldValue(row.travel_actual),
+    prelims_actual: actualFieldValue(row.prelims_actual),
+    other_actual: actualFieldValue(row.other_actual),
+    revenue_actual: actualFieldValue(row.revenue_actual),
+    notes: row.notes || "",
+  };
 }
 
 function formatOptionalMoney(value: number | null | undefined) {
@@ -652,16 +670,7 @@ export default function EstimateEditorPage() {
       .then((row) => {
         if (cancelled) return;
         setJobActuals(row);
-        setActualsForm({
-          materials_actual: actualFieldValue(row.materials_actual),
-          labour_actual: actualFieldValue(row.labour_actual),
-          waste_actual: actualFieldValue(row.waste_actual),
-          travel_actual: actualFieldValue(row.travel_actual),
-          prelims_actual: actualFieldValue(row.prelims_actual),
-          other_actual: actualFieldValue(row.other_actual),
-          revenue_actual: actualFieldValue(row.revenue_actual),
-          notes: row.notes || "",
-        });
+        setActualsForm(applyJobActualsToForm(row));
       })
       .catch((err) => {
         if (!cancelled) {
@@ -672,6 +681,50 @@ export default function EstimateEditorPage() {
       cancelled = true;
     };
   }, [estimateId, estimate?.status]);
+
+  function applyActualsResponse(row: JobActuals) {
+    setJobActuals(row);
+    setActualsForm(applyJobActualsToForm(row));
+  }
+
+  async function onAddActualEntry(payload: {
+    category: ActualCostCategoryKey;
+    description: string;
+    amount: number;
+    occurred_on: string;
+    supplier_ref: string;
+  }) {
+    if (!estimateId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await createActualCostEntry(estimateId, payload);
+      applyActualsResponse(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not add actual cost entry",
+      );
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onDeleteActualEntry(entryId: number) {
+    if (!estimateId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await deleteActualCostEntry(estimateId, entryId);
+      applyActualsResponse(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not remove actual cost entry",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function canAccessStep(target: Step) {
     if (target === "customer") return true;
@@ -1120,16 +1173,7 @@ export default function EstimateEditorPage() {
         notes: actualsForm.notes,
       });
       setJobActuals(updated);
-      setActualsForm({
-        materials_actual: actualFieldValue(updated.materials_actual),
-        labour_actual: actualFieldValue(updated.labour_actual),
-        waste_actual: actualFieldValue(updated.waste_actual),
-        travel_actual: actualFieldValue(updated.travel_actual),
-        prelims_actual: actualFieldValue(updated.prelims_actual),
-        other_actual: actualFieldValue(updated.other_actual),
-        revenue_actual: actualFieldValue(updated.revenue_actual),
-        notes: updated.notes || "",
-      });
+      setActualsForm(applyJobActualsToForm(updated));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save actual costs");
     } finally {
@@ -3338,8 +3382,9 @@ export default function EstimateEditorPage() {
             </div>
             <p className="muted">
               Leave a category blank until the cost is known. Blank means not
-              entered — not £0. Final actual margin is shown only when all cost
-              categories are filled.
+              entered — not £0. Add detailed lines for invoices or labour days;
+              those totals roll up automatically. Final actual margin is shown
+              only when all cost categories are filled.
             </p>
             {jobActuals ? (
               <div className="info-banner actuals-status-banner">
@@ -3370,124 +3415,81 @@ export default function EstimateEditorPage() {
             ) : null}
             {canManageActuals ? (
               <form className="stack" onSubmit={onSaveActuals}>
-                <div className="row">
-                  <div className="field">
-                    <label htmlFor="materials_actual">Materials (£)</label>
-                    <input
-                      id="materials_actual"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={actualsForm.materials_actual}
-                      onChange={(e) =>
+                {(
+                  [
+                    {
+                      category: "materials" as const,
+                      label: "Materials",
+                      inputId: "materials_actual",
+                      estimated: estimate.materials_cost || 0,
+                      formKey: "materials_actual" as const,
+                    },
+                    {
+                      category: "labour" as const,
+                      label: "Labour",
+                      inputId: "labour_actual",
+                      estimated: estimate.labour_cost || 0,
+                      formKey: "labour_actual" as const,
+                    },
+                    {
+                      category: "waste" as const,
+                      label: "Waste",
+                      inputId: "waste_actual",
+                      estimated: estimate.waste_cost || 0,
+                      formKey: "waste_actual" as const,
+                    },
+                    {
+                      category: "travel" as const,
+                      label: "Travel",
+                      inputId: "travel_actual",
+                      estimated: estimate.travel_cost || 0,
+                      formKey: "travel_actual" as const,
+                    },
+                    {
+                      category: "prelims" as const,
+                      label: "Preliminaries",
+                      inputId: "prelims_actual",
+                      estimated: estimate.prelim_cost || 0,
+                      formKey: "prelims_actual" as const,
+                    },
+                    {
+                      category: "other" as const,
+                      label: "Other",
+                      inputId: "other_actual",
+                      estimated: 0,
+                      formKey: "other_actual" as const,
+                    },
+                  ] as const
+                ).map((item) => {
+                  const driven = Boolean(
+                    jobActuals?.entry_driven_categories?.includes(item.category),
+                  );
+                  const entries =
+                    jobActuals?.entries?.filter(
+                      (row) => row.category === item.category,
+                    ) || [];
+                  return (
+                    <ActualCostCategory
+                      key={item.category}
+                      category={item.category}
+                      label={item.label}
+                      inputId={item.inputId}
+                      estimated={item.estimated}
+                      totalValue={actualsForm[item.formKey]}
+                      entries={entries}
+                      drivenByEntries={driven}
+                      busy={saving}
+                      onTotalChange={(value) =>
                         setActualsForm({
                           ...actualsForm,
-                          materials_actual: e.target.value,
+                          [item.formKey]: value,
                         })
                       }
+                      onAddEntry={onAddActualEntry}
+                      onDeleteEntry={onDeleteActualEntry}
                     />
-                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-                      Estimated: {formatMoney(estimate.materials_cost || 0)}
-                    </p>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="labour_actual">Labour (£)</label>
-                    <input
-                      id="labour_actual"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={actualsForm.labour_actual}
-                      onChange={(e) =>
-                        setActualsForm({
-                          ...actualsForm,
-                          labour_actual: e.target.value,
-                        })
-                      }
-                    />
-                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-                      Estimated: {formatMoney(estimate.labour_cost || 0)}
-                    </p>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="waste_actual">Waste (£)</label>
-                    <input
-                      id="waste_actual"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={actualsForm.waste_actual}
-                      onChange={(e) =>
-                        setActualsForm({
-                          ...actualsForm,
-                          waste_actual: e.target.value,
-                        })
-                      }
-                    />
-                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-                      Estimated: {formatMoney(estimate.waste_cost || 0)}
-                    </p>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="field">
-                    <label htmlFor="travel_actual">Travel (£)</label>
-                    <input
-                      id="travel_actual"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={actualsForm.travel_actual}
-                      onChange={(e) =>
-                        setActualsForm({
-                          ...actualsForm,
-                          travel_actual: e.target.value,
-                        })
-                      }
-                    />
-                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-                      Estimated: {formatMoney(estimate.travel_cost || 0)}
-                    </p>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="prelims_actual">Preliminaries (£)</label>
-                    <input
-                      id="prelims_actual"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={actualsForm.prelims_actual}
-                      onChange={(e) =>
-                        setActualsForm({
-                          ...actualsForm,
-                          prelims_actual: e.target.value,
-                        })
-                      }
-                    />
-                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-                      Estimated: {formatMoney(estimate.prelim_cost || 0)}
-                    </p>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="other_actual">Other (£)</label>
-                    <input
-                      id="other_actual"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={actualsForm.other_actual}
-                      onChange={(e) =>
-                        setActualsForm({
-                          ...actualsForm,
-                          other_actual: e.target.value,
-                        })
-                      }
-                    />
-                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
-                      Estimated: {formatMoney(0)}
-                    </p>
-                  </div>
-                </div>
+                  );
+                })}
                 <div className="field">
                   <label htmlFor="revenue_actual">
                     Revenue / sell (£) — leave blank to use quoted sell

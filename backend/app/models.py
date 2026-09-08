@@ -259,6 +259,12 @@ class Estimate(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    actual_entries: Mapped[list["EstimateActualEntry"]] = relationship(
+        "EstimateActualEntry",
+        back_populates="estimate",
+        cascade="all, delete-orphan",
+        order_by="EstimateActualEntry.sort_order, EstimateActualEntry.id",
+    )
 
 
 class EstimateActuals(Base):
@@ -281,6 +287,26 @@ class EstimateActuals(Base):
     )
 
     estimate: Mapped["Estimate"] = relationship("Estimate", back_populates="actuals")
+
+
+class EstimateActualEntry(Base):
+    """Detailed actual cost line that rolls up into a category total."""
+
+    __tablename__ = "estimate_actual_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    estimate_id: Mapped[int] = mapped_column(ForeignKey("estimates.id"), index=True)
+    category: Mapped[str] = mapped_column(String(40), index=True)
+    description: Mapped[str] = mapped_column(String(300), default="")
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    occurred_on: Mapped[str] = mapped_column(String(20), default="")
+    supplier_ref: Mapped[str] = mapped_column(String(120), default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    estimate: Mapped["Estimate"] = relationship(
+        "Estimate", back_populates="actual_entries"
+    )
 
 
 class EstimateItem(Base):
