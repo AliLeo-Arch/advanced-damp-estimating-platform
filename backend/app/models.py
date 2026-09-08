@@ -282,6 +282,7 @@ class EstimateActuals(Base):
     other_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
     revenue_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
+    marked_complete: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )

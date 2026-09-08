@@ -260,6 +260,7 @@ class ActualsRead(BaseModel):
     other_actual: float | None
     revenue_actual: float | None
     notes: str
+    marked_complete: bool = False
     status: str = "not_started"
     categories_entered: int = 0
     categories_total: int = 6

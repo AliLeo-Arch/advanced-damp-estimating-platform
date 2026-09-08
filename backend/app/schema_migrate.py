@@ -41,6 +41,10 @@ PRICING_SETTINGS_COLUMNS = {
     "quote_prefix": "TEXT DEFAULT 'EST'",
 }
 
+ACTUALS_COLUMNS = {
+    "marked_complete": "INTEGER DEFAULT 0",
+}
+
 
 def _add_missing(conn, table: str, columns: dict[str, str]) -> None:
     rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
@@ -57,3 +61,21 @@ def ensure_sqlite_columns(engine: Engine) -> None:
         _add_missing(conn, "estimates", ESTIMATE_COLUMNS)
         _add_missing(conn, "rate_items", RATE_ITEM_COLUMNS)
         _add_missing(conn, "pricing_settings", PRICING_SETTINGS_COLUMNS)
+        _add_missing(conn, "estimate_actuals", ACTUALS_COLUMNS)
+        # Backfill: rows that already have every cost category filled are treated
+        # as historically complete so reporting does not regress.
+        conn.execute(
+            text(
+                """
+                UPDATE estimate_actuals
+                SET marked_complete = 1
+                WHERE COALESCE(marked_complete, 0) = 0
+                  AND materials_actual IS NOT NULL
+                  AND labour_actual IS NOT NULL
+                  AND waste_actual IS NOT NULL
+                  AND travel_actual IS NOT NULL
+                  AND prelims_actual IS NOT NULL
+                  AND other_actual IS NOT NULL
+                """
+            )
+        )

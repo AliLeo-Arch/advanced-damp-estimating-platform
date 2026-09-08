@@ -89,20 +89,14 @@ def read_csv_rows(path: Path) -> list[dict[str, str]]:
         return [dict(row) for row in reader]
 
 
-def import_rates_from_csv(
+def import_rates_from_rows(
     db: Session,
-    path: Path,
+    rows: list[dict[str, str]],
     *,
     dry_run: bool = False,
 ) -> ImportResult:
     result = ImportResult()
-    try:
-        raw_rows = read_csv_rows(path)
-    except Exception as exc:
-        result.errors.append(str(exc))
-        return result
-
-    for index, raw in enumerate(raw_rows, start=2):
+    for index, raw in enumerate(rows, start=2):
         if not any(str(v or "").strip() for v in raw.values()):
             result.skipped += 1
             continue
@@ -148,6 +142,21 @@ def import_rates_from_csv(
         db.commit()
 
     return result
+
+
+def import_rates_from_csv(
+    db: Session,
+    path: Path,
+    *,
+    dry_run: bool = False,
+) -> ImportResult:
+    result = ImportResult()
+    try:
+        raw_rows = read_csv_rows(path)
+    except Exception as exc:
+        result.errors.append(str(exc))
+        return result
+    return import_rates_from_rows(db, raw_rows, dry_run=dry_run)
 
 
 def export_rates_to_csv(

@@ -84,6 +84,29 @@ class PricingSettingsUpdate(BaseModel):
     quote_prefix: str | None = Field(default=None, max_length=20)
 
 
+class RateImportRow(BaseModel):
+    code: str
+    name: str
+    category: str
+    cost_per_unit: float | str
+    unit: str | None = "each"
+    waste_percent: float | str | None = 0
+    notes: str | None = ""
+    active: bool | str | None = True
+
+
+class RateImportRequest(BaseModel):
+    rows: list[RateImportRow]
+
+
+class RateImportResponse(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    errors: list[str] = []
+
+
+
 def _settings_read(settings) -> PricingSettingsRead:
     from app.company import resolve_company_profile
 
@@ -167,6 +190,42 @@ def list_categories(
 ) -> dict:
     rows = db.query(RateItem.category).distinct().all()
     return {"categories": sorted({row[0] for row in rows if row[0]})}
+
+
+@router.post("/import", response_model=RateImportResponse)
+def import_rates(
+    payload: RateImportRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("manage_rates")),
+) -> RateImportResponse:
+    from app.rate_import import import_rates_from_rows
+
+    rows = [row.model_dump() for row in payload.rows]
+    # normalize_row expects string-ish dict values
+    string_rows: list[dict[str, str]] = []
+    for row in rows:
+        string_rows.append({key: "" if value is None else str(value) for key, value in row.items()})
+    result = import_rates_from_rows(db, string_rows)
+    if result.errors:
+        raise HTTPException(status_code=400, detail="; ".join(result.errors[:8]))
+    write_audit(
+        db,
+        action="rates_imported",
+        entity_type="rate",
+        entity_id="",
+        detail={
+            "created": result.created,
+            "updated": result.updated,
+            "skipped": result.skipped,
+        },
+        actor=user,
+    )
+    return RateImportResponse(
+        created=result.created,
+        updated=result.updated,
+        skipped=result.skipped,
+        errors=result.errors,
+    )
 
 
 @router.post("/", response_model=RateItemRead, status_code=201)

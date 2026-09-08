@@ -97,15 +97,16 @@ Change passwords and JWT secret before live use.
 
 - JWT auth with roles and permissions
 - Customer / site / survey CRM
-- Rate admin with searchable, paginated rate table and commercial settings
+- Rate admin with searchable table, drawers, history, and CSV upsert import
 - Pricing engine with job-level allowance allocation and PDF-safe reconciliation
 - Estimate lifecycle with approval gates and revisions
-- Estimate dashboard advanced search, filters, and pagination
+- Estimate dashboard search, filters, presets, and ops pipeline counts
 - Branded quotation PDF plus CSV and Excel (`.xlsx`) export
-- Seeded demo estimates for walkthrough testing
-- Job actuals and variance
+- Reports workspace (pipeline + completed job-cost variance)
+- Job actuals with detailed cost lines, draft save, and mark-complete
 - Admin backups, logging, health check
 - Single-port production mode (`start-production.ps1`)
+- Field mode toggle for site entry
 
 ## Backup
 

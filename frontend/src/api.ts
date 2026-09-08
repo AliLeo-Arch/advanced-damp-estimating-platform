@@ -461,6 +461,7 @@ export type JobActuals = {
   other_actual: number | null;
   revenue_actual: number | null;
   notes: string;
+  marked_complete: boolean;
   status: ActualsEntryStatus;
   categories_entered: number;
   categories_total: number;
@@ -600,6 +601,32 @@ export function deleteActualCostEntry(estimateId: number, entryId: number) {
     `/api/estimates/${estimateId}/actuals/entries/${entryId}`,
     { method: "DELETE" },
   );
+}
+
+export function markActualsComplete(estimateId: number) {
+  return request<JobActuals>(`/api/estimates/${estimateId}/actuals/complete`, {
+    method: "POST",
+  });
+}
+
+export function reopenActuals(estimateId: number) {
+  return request<JobActuals>(`/api/estimates/${estimateId}/actuals/reopen`, {
+    method: "POST",
+  });
+}
+
+export type RateImportResult = {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+};
+
+export function importRates(rows: Array<Record<string, string | number | boolean>>) {
+  return request<RateImportResult>("/api/rates/import", {
+    method: "POST",
+    body: JSON.stringify({ rows }),
+  });
 }
 
 export function listWorkTypes() {

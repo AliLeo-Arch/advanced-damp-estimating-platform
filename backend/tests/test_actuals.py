@@ -36,6 +36,7 @@ def test_variance_calculation_when_complete():
         prelims_actual=120,
         other_actual=25,
         revenue_actual=None,
+        marked_complete=1,
     )
     comparison = build_comparison(estimate, actuals)
     assert comparison.status == "complete"
@@ -181,6 +182,25 @@ def test_sync_category_totals_from_entries_mutates_row():
     assert actuals.waste_actual == 55.0
 
 
+def test_all_categories_without_mark_stay_partial():
+    estimate = _base_estimate()
+    actuals = EstimateActuals(
+        estimate_id=1,
+        materials_actual=420,
+        labour_actual=350,
+        waste_actual=90,
+        travel_actual=50,
+        prelims_actual=120,
+        other_actual=25,
+        revenue_actual=None,
+        marked_complete=0,
+    )
+    comparison = build_comparison(estimate, actuals)
+    assert comparison.status == "partial"
+    assert comparison.categories_entered == 6
+    assert comparison.actual_margin_percent is None
+
+
 def test_genuine_zero_other_cost_is_entered():
     estimate = _base_estimate()
     actuals = EstimateActuals(
@@ -193,6 +213,7 @@ def test_genuine_zero_other_cost_is_entered():
         other_actual=0,
         revenue_actual=1400,
         notes="all categories known",
+        marked_complete=1,
     )
     comparison = build_comparison(estimate, actuals)
     assert comparison.status == "complete"
@@ -231,6 +252,7 @@ def test_list_csv_includes_actuals_columns():
         prelims_actual=100,
         other_actual=0,
         revenue_actual=2000,
+        marked_complete=1,
     )
     csv_bytes = render_estimates_list_csv([estimate])
     text = csv_bytes.decode("utf-8-sig")

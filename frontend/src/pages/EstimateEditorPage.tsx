@@ -31,9 +31,11 @@ import {
   listSites,
   listSurveys,
   listWorkTypes,
+  markActualsComplete,
   PricingSettings,
   Quotation,
   RateItem,
+  reopenActuals,
   reviseEstimate,
   Site,
   Survey,
@@ -498,7 +500,14 @@ export default function EstimateEditorPage() {
               measurements: item.measurements || defaultMeasurements(item.work_type),
             })),
           );
-          if (row.items.length) setStep("scope");
+          if (
+            searchParams.get("step") === "actuals" &&
+            ACTUALS_STATUSES.has(row.status)
+          ) {
+            setStep("actuals");
+          } else if (row.items.length) {
+            setStep("scope");
+          }
         } else if (surveyIdParam) {
           const surveyId = Number(surveyIdParam);
           if (!Number.isNaN(surveyId)) {
@@ -720,6 +729,38 @@ export default function EstimateEditorPage() {
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not remove actual cost entry",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onMarkActualsComplete() {
+    if (!estimateId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await markActualsComplete(estimateId);
+      applyActualsResponse(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not mark actuals complete",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onReopenActuals() {
+    if (!estimateId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await reopenActuals(estimateId);
+      applyActualsResponse(updated);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not reopen actuals",
       );
     } finally {
       setSaving(false);
@@ -3478,6 +3519,7 @@ export default function EstimateEditorPage() {
                       totalValue={actualsForm[item.formKey]}
                       entries={entries}
                       drivenByEntries={driven}
+                      disabled={Boolean(jobActuals?.marked_complete)}
                       busy={saving}
                       onTotalChange={(value) =>
                         setActualsForm({
@@ -3500,6 +3542,7 @@ export default function EstimateEditorPage() {
                     min={0}
                     step="0.01"
                     value={actualsForm.revenue_actual}
+                    disabled={Boolean(jobActuals?.marked_complete)}
                     onChange={(e) =>
                       setActualsForm({
                         ...actualsForm,
@@ -3517,16 +3560,48 @@ export default function EstimateEditorPage() {
                     id="actuals_notes"
                     rows={2}
                     value={actualsForm.notes}
+                    disabled={Boolean(jobActuals?.marked_complete)}
                     onChange={(e) =>
                       setActualsForm({ ...actualsForm, notes: e.target.value })
                     }
                   />
                 </div>
                 <div className="step-actions">
-                  <button className="btn btn-primary" type="submit" disabled={saving}>
-                    {saving ? "Saving…" : "Save actual costs"}
+                  <button className="btn btn-secondary" type="submit" disabled={saving}>
+                    {saving ? "Saving…" : "Save draft actuals"}
                   </button>
+                  {jobActuals?.marked_complete ? (
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void onReopenActuals()}
+                    >
+                      Reopen actuals
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary"
+                      type="button"
+                      disabled={
+                        saving ||
+                        (jobActuals?.categories_entered || 0) <
+                          (jobActuals?.categories_total || 6)
+                      }
+                      onClick={() => void onMarkActualsComplete()}
+                    >
+                      Mark actuals complete
+                    </button>
+                  )}
                 </div>
+                {jobActuals &&
+                jobActuals.categories_entered >= jobActuals.categories_total &&
+                !jobActuals.marked_complete ? (
+                  <p className="muted" style={{ margin: 0 }}>
+                    All categories are entered. Mark complete to lock the final
+                    actual margin KPI for reporting.
+                  </p>
+                ) : null}
               </form>
             ) : (
               <div className="info-banner">

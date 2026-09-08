@@ -338,9 +338,7 @@ export default function App() {
 
       <footer className="app-footer">
         <div className="app-footer-inner">
-          <span>
-            {company.name} · Local production foundation
-          </span>
+          <span>© {new Date().getFullYear()} {company.name}</span>
           <span>
             <a href={`tel:${company.phone.replace(/\s+/g, "")}`}>
               {company.phone}

@@ -120,25 +120,36 @@ def normalize_actuals_values(actuals: EstimateActuals) -> _ActualsView:
     )
 
 
-def actuals_entry_status(view: _ActualsView) -> tuple[str, int, int]:
+def actuals_entry_status(
+    view: _ActualsView,
+    *,
+    marked_complete: bool = False,
+) -> tuple[str, int, int]:
     entered = sum(
         1 for field in COST_CATEGORY_FIELDS if getattr(view, field) is not None
     )
     total = len(COST_CATEGORY_FIELDS)
     if entered == 0:
         return "not_started", 0, total
-    if entered >= total:
+    if marked_complete and entered >= total:
         return "complete", entered, total
     return "partial", entered, total
 
 
 def build_comparison(estimate: Estimate, actuals: EstimateActuals) -> ActualsComparison:
-    return build_comparison_from_view(estimate, normalize_actuals_values(actuals))
+    marked = bool(getattr(actuals, "marked_complete", 0))
+    return build_comparison_from_view(
+        estimate,
+        normalize_actuals_values(actuals),
+        marked_complete=marked,
+    )
 
 
 def build_comparison_from_view(
     estimate: Estimate,
     view: _ActualsView,
+    *,
+    marked_complete: bool = False,
 ) -> ActualsComparison:
     est_materials = round_money(estimate.materials_cost or 0)
     est_labour = round_money(estimate.labour_cost or 0)
@@ -151,7 +162,10 @@ def build_comparison_from_view(
     est_margin_value = round_money(estimate.margin_value or 0)
     est_margin_percent = round(estimate.margin_percent or 0, 2)
 
-    status, categories_entered, categories_total = actuals_entry_status(view)
+    status, categories_entered, categories_total = actuals_entry_status(
+        view,
+        marked_complete=marked_complete,
+    )
 
     act_materials = _as_optional_money(view.materials_actual)
     act_labour = _as_optional_money(view.labour_actual)

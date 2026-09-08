@@ -104,7 +104,12 @@ def _serialize_entry(entry: EstimateActualEntry) -> ActualEntryRead:
 def _serialize(estimate: Estimate, actuals: EstimateActuals, db: Session) -> ActualsRead:
     entries = _list_entries(db, estimate.id)
     view, driven = view_with_entries(actuals, entries)
-    comparison = build_comparison_from_view(estimate, view)
+    marked = bool(getattr(actuals, "marked_complete", 0))
+    comparison = build_comparison_from_view(
+        estimate,
+        view,
+        marked_complete=marked,
+    )
     return ActualsRead(
         estimate_id=estimate.id,
         materials_actual=view.materials_actual,
@@ -115,6 +120,7 @@ def _serialize(estimate: Estimate, actuals: EstimateActuals, db: Session) -> Act
         other_actual=view.other_actual,
         revenue_actual=view.revenue_actual,
         notes=view.notes,
+        marked_complete=marked,
         status=comparison.status,
         categories_entered=comparison.categories_entered,
         categories_total=comparison.categories_total,
@@ -122,6 +128,25 @@ def _serialize(estimate: Estimate, actuals: EstimateActuals, db: Session) -> Act
         entry_driven_categories=sorted(driven),
         comparison=comparison_to_dict(comparison),
     )
+
+
+def _refresh_marked_complete(actuals: EstimateActuals, entries: list) -> None:
+    """Clear the complete flag if category coverage is no longer full."""
+    view, _driven = view_with_entries(actuals, entries)
+    entered = sum(
+        1
+        for field in (
+            "materials_actual",
+            "labour_actual",
+            "waste_actual",
+            "travel_actual",
+            "prelims_actual",
+            "other_actual",
+        )
+        if getattr(view, field) is not None
+    )
+    if entered < 6 and getattr(actuals, "marked_complete", 0):
+        actuals.marked_complete = 0
 
 
 def _validate_category(category: str) -> str:
@@ -157,7 +182,11 @@ def actuals_summary(
             continue
         entries = _list_entries(db, estimate.id)
         view, _driven = view_with_entries(actuals, entries)
-        comparison = build_comparison_from_view(estimate, view)
+        comparison = build_comparison_from_view(
+            estimate,
+            view,
+            marked_complete=bool(getattr(actuals, "marked_complete", 0)),
+        )
         if comparison.status != "complete":
             continue
         if (
@@ -246,6 +275,7 @@ def update_actuals(
 
     actuals.revenue_actual = payload.revenue_actual
     actuals.notes = payload.notes
+    _refresh_marked_complete(actuals, entries)
     db.commit()
     db.refresh(actuals)
 
@@ -260,7 +290,76 @@ def update_actuals(
             "total_actual": comparison.total_cost.actual,
             "actual_margin_percent": comparison.actual_margin_percent,
             "entry_driven_categories": sorted(driven),
+            "marked_complete": bool(getattr(actuals, "marked_complete", 0)),
         },
+        actor=user,
+    )
+    return _serialize(estimate, actuals, db)
+
+
+@router.post("/{estimate_id}/actuals/complete", response_model=ActualsRead)
+def mark_actuals_complete(
+    estimate_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("manage_actuals")),
+) -> ActualsRead:
+    estimate = _get_estimate_or_404(estimate_id, db)
+    _require_actuals_eligible(estimate, writing=True)
+    actuals = _get_or_create_actuals(db, estimate_id)
+    entries = _list_entries(db, estimate_id)
+    sync_category_totals_from_entries(actuals, entries)
+    view, _driven = view_with_entries(actuals, entries)
+    entered = sum(
+        1
+        for field in (
+            "materials_actual",
+            "labour_actual",
+            "waste_actual",
+            "travel_actual",
+            "prelims_actual",
+            "other_actual",
+        )
+        if getattr(view, field) is not None
+    )
+    if entered < 6:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "All six cost categories must be entered before marking actuals complete."
+            ),
+        )
+    actuals.marked_complete = 1
+    db.commit()
+    db.refresh(actuals)
+    write_audit(
+        db,
+        action="actuals_marked_complete",
+        entity_type="estimate",
+        entity_id=estimate.id,
+        detail={"reference": estimate.reference},
+        actor=user,
+    )
+    return _serialize(estimate, actuals, db)
+
+
+@router.post("/{estimate_id}/actuals/reopen", response_model=ActualsRead)
+def reopen_actuals(
+    estimate_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("manage_actuals")),
+) -> ActualsRead:
+    estimate = _get_estimate_or_404(estimate_id, db)
+    _require_actuals_eligible(estimate, writing=True)
+    actuals = _get_or_create_actuals(db, estimate_id)
+    actuals.marked_complete = 0
+    db.commit()
+    db.refresh(actuals)
+    write_audit(
+        db,
+        action="actuals_reopened",
+        entity_type="estimate",
+        entity_id=estimate.id,
+        detail={"reference": estimate.reference},
         actor=user,
     )
     return _serialize(estimate, actuals, db)
@@ -297,6 +396,7 @@ def create_actual_entry(
     db.flush()
     entries = _list_entries(db, estimate_id)
     sync_category_totals_from_entries(actuals, entries)
+    _refresh_marked_complete(actuals, entries)
     db.commit()
     db.refresh(actuals)
 
@@ -345,6 +445,7 @@ def update_actual_entry(
 
     entries = _list_entries(db, estimate_id)
     sync_category_totals_from_entries(actuals, entries)
+    _refresh_marked_complete(actuals, entries)
     db.commit()
     db.refresh(actuals)
 
@@ -390,6 +491,7 @@ def delete_actual_entry(
     # returns to "not entered" rather than leaving a stale sum.
     if category not in driven and category in CATEGORY_TO_FIELD:
         setattr(actuals, CATEGORY_TO_FIELD[category], None)
+    _refresh_marked_complete(actuals, remaining)
 
     db.commit()
     db.refresh(actuals)

@@ -6,6 +6,7 @@ import SideDrawer from "../components/SideDrawer";
 import {
   createRate,
   formatMoney,
+  importRates,
   listRateCategories,
   listRateVersions,
   RateItem,
@@ -113,34 +114,35 @@ export default function RatesPage() {
           throw new Error(`CSV missing required column: ${key}`);
         }
       }
-      let created = 0;
+      const rows: Array<Record<string, string>> = [];
       for (const line of lines.slice(1)) {
         const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
         const code = cols[idx("code")];
         const name = cols[idx("name")];
         const category = cols[idx("category")];
-        const cost = Number(cols[idx("cost_per_unit")]);
-        if (!code || !name || !category || Number.isNaN(cost)) continue;
-        await createRate({
+        const cost = cols[idx("cost_per_unit")];
+        if (!code || !name || !category || !cost) continue;
+        rows.push({
           code,
           name,
           category,
-          unit: idx("unit") >= 0 ? cols[idx("unit")] || "each" : "each",
           cost_per_unit: cost,
+          unit: idx("unit") >= 0 ? cols[idx("unit")] || "each" : "each",
           waste_percent:
-            idx("waste_percent") >= 0
-              ? Number(cols[idx("waste_percent")] || 0)
-              : 0,
+            idx("waste_percent") >= 0 ? cols[idx("waste_percent")] || "0" : "0",
           notes: idx("notes") >= 0 ? cols[idx("notes")] || "" : "",
-          active: true,
+          active: "true",
         });
-        created += 1;
       }
+      if (!rows.length) {
+        throw new Error("No valid rate rows found in the CSV.");
+      }
+      const result = await importRates(rows);
       await refresh();
       setMessage(
-        created
-          ? `Imported ${created} rate${created === 1 ? "" : "s"} from CSV.`
-          : "No valid rate rows found in the CSV.",
+        `Import complete: ${result.created} created, ${result.updated} updated` +
+          (result.skipped ? `, ${result.skipped} skipped` : "") +
+          ".",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "CSV import failed.");
@@ -391,9 +393,9 @@ export default function RatesPage() {
                 </h2>
                 <p className="muted rate-table-lead">
                   {total} rate{total === 1 ? "" : "s"} across{" "}
-                  {categoryOptions.length} categories. CSV import expects
-                  columns: code, name, category, cost_per_unit (optional: unit,
-                  waste_percent, notes).
+                  {categoryOptions.length} categories. CSV import upserts by
+                  code (creates or updates). Columns: code, name, category,
+                  cost_per_unit (optional: unit, waste_percent, notes).
                 </p>
               </div>
               <div className="rate-table-header-actions">
