@@ -51,12 +51,25 @@ class Settings(BaseSettings):
     cors_allow_vercel_previews: bool = Field(
         default_factory=lambda: bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
     )
+    # Explicit override for login demo helpers (true/false). Empty = derive from app_env.
+    show_demo_helpers: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
     @property
     def is_vercel(self) -> bool:
         return self.app_env == "vercel" or bool(os.getenv("VERCEL"))
+
+    @property
+    def demo_helpers_enabled(self) -> bool:
+        """Demo login hints are off in production-like environments by default."""
+        flag = (self.show_demo_helpers or "").strip().lower()
+        if flag in {"1", "true", "yes", "on"}:
+            return True
+        if flag in {"0", "false", "no", "off"}:
+            return False
+        env = (self.app_env or "").strip().lower()
+        return env in {"demo", "development", "local", "dev"}
 
     @property
     def cors_origin_list(self) -> list[str]:

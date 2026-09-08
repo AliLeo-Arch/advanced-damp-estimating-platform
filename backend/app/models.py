@@ -268,12 +268,12 @@ class EstimateActuals(Base):
     estimate_id: Mapped[int] = mapped_column(
         ForeignKey("estimates.id"), unique=True, index=True
     )
-    materials_actual: Mapped[float] = mapped_column(Float, default=0.0)
-    labour_actual: Mapped[float] = mapped_column(Float, default=0.0)
-    waste_actual: Mapped[float] = mapped_column(Float, default=0.0)
-    travel_actual: Mapped[float] = mapped_column(Float, default=0.0)
-    prelims_actual: Mapped[float] = mapped_column(Float, default=0.0)
-    other_actual: Mapped[float] = mapped_column(Float, default=0.0)
+    materials_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    labour_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    waste_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    travel_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    prelims_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    other_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
     revenue_actual: Mapped[float | None] = mapped_column(Float, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(

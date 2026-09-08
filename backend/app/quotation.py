@@ -126,15 +126,13 @@ def build_quotation(db: Session, estimate: Estimate) -> QuotationRead:
         for item in read.items
     ]
     line_sum = round_money(sum(float(line["amount"]) for line in scope_lines))
-    reconciled = abs(line_sum - subtotal) < 0.005 or not scope_lines
-    if scope_lines and not reconciled:
-        # Final safety net: adjust last displayed line so customer PDF cannot drift
-        drift = round_money(subtotal - sum(float(l["amount"]) for l in scope_lines[:-1]))
-        scope_lines[-1]["amount"] = drift
-        line_sum = subtotal
-        reconciled = True
+    lines_reconciled = (not scope_lines) or abs(line_sum - subtotal) < 0.005
 
     vat_amount = round_money(subtotal * vat_rate)
+    total_inc_vat = round_money(subtotal + vat_amount)
+    totals_reconciled = abs(total_inc_vat - round_money(subtotal + vat_amount)) < 0.005
+    amounts_reconciled = lines_reconciled and totals_reconciled
+
     terms = quotation_terms(settings_row)
     company = resolve_company_profile(settings_row)
 
@@ -148,7 +146,7 @@ def build_quotation(db: Session, estimate: Estimate) -> QuotationRead:
         company_tagline=company.tagline,
         vat_rate=vat_rate,
         vat_amount=vat_amount,
-        total_inc_vat=round_money(subtotal + vat_amount),
+        total_inc_vat=total_inc_vat,
         validity_days=validity_days,
         issue_date=issue_date.isoformat(),
         valid_until=valid_until.isoformat(),
@@ -160,7 +158,7 @@ def build_quotation(db: Session, estimate: Estimate) -> QuotationRead:
         survey_fee_credit_wording=str(terms["survey_fee_credit_wording"]),
         acceptance_instructions=str(terms["acceptance_instructions"]),
         scope_lines=scope_lines,
-        lines_reconciled=reconciled,
+        lines_reconciled=amounts_reconciled,
         line_amount_sum=line_sum,
         revision_no=read.revision_no or 1,
     )
@@ -179,6 +177,7 @@ def lock_quotation_snapshot(db: Session, estimate: Estimate) -> Estimate:
     if estimate.quote_vat_rate is None:
         estimate.quote_vat_rate = float(settings_row.vat_rate or 0.20)
     # Immutable commercial freeze for this issued quotation (SQLite-friendly JSON).
+    line_sum = round_money(sum(float(item.line_sell or 0) for item in estimate.items))
     estimate.quotation_snapshot_json = json.dumps(
         {
             "reference": estimate.reference,
@@ -188,6 +187,9 @@ def lock_quotation_snapshot(db: Session, estimate: Estimate) -> Estimate:
             "margin_percent": estimate.margin_percent,
             "margin_value": estimate.margin_value,
             "vat_rate": estimate.quote_vat_rate,
+            "line_amount_sum": line_sum,
+            "lines_reconciled": abs(line_sum - round_money(float(estimate.sell_price or 0)))
+            < 0.005,
             "issued_at": estimate.quote_issued_at.isoformat()
             if estimate.quote_issued_at
             else None,
@@ -197,6 +199,15 @@ def lock_quotation_snapshot(db: Session, estimate: Estimate) -> Estimate:
             "customer_name": estimate.customer_name,
             "site_address": estimate.site_address,
             "postcode": estimate.postcode,
+            "scope_lines": [
+                {
+                    "label": item.label,
+                    "amount": round_money(float(item.line_sell or 0)),
+                }
+                for item in sorted(
+                    estimate.items, key=lambda row: (row.sort_order, row.id or 0)
+                )
+            ],
             "breakdown": json.loads(estimate.breakdown_json or "{}"),
             "rates_snapshot": json.loads(estimate.rates_snapshot_json or "{}"),
         }
@@ -393,13 +404,6 @@ def render_quotation_pdf(quote: QuotationRead) -> tuple[BytesIO, str]:
         )
     )
     story.append(totals)
-    if quote.lines_reconciled:
-        story.append(
-            Paragraph(
-                f"Line amounts sum to subtotal (£{quote.line_amount_sum:,.2f}).",
-                muted,
-            )
-        )
 
     story.extend(
         [

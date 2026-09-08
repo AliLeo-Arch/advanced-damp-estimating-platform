@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { EstimateListSkeleton, Spinner } from "../components/Loading";
+import StatusPill from "../components/StatusPill";
 import {
   ActualsSummary,
   Estimate,
@@ -10,21 +11,50 @@ import {
   formatMoney,
   getActualsSummary,
   getHealth,
+  getOpsSummary,
+  OpsSummary,
   searchEstimates,
 } from "../api";
+import {
+  ESTIMATE_STATUS_OPTIONS,
+  estimateOpenActionLabel,
+  formatEstimateStatus,
+} from "../estimateStatus";
+import { formatUkDate } from "../locale";
+import { getStoredUser } from "../auth";
 
-const STATUS_OPTIONS = [
-  { value: "draft", label: "Draft" },
-  { value: "priced", label: "Priced" },
-  { value: "review_required", label: "Review required" },
-  { value: "approved", label: "Approved" },
-  { value: "ready_to_quote", label: "Ready to quote" },
-  { value: "quoted", label: "Quoted" },
-  { value: "accepted", label: "Accepted" },
-  { value: "declined", label: "Declined" },
-  { value: "expired", label: "Expired" },
-  { value: "closed", label: "Closed" },
-] as const;
+const STATUS_OPTIONS = ESTIMATE_STATUS_OPTIONS;
+
+const FILTER_PRESETS_KEY = "teq.filterPresets.v1";
+const ROLE_DEFAULT_APPLIED_KEY = "teq.roleDefaultFilters.v1";
+
+type FilterPreset = {
+  id: string;
+  name: string;
+  filters: EstimateSearchFilters;
+};
+
+function loadFilterPresets(): FilterPreset[] {
+  try {
+    const raw = localStorage.getItem(FILTER_PRESETS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as FilterPreset[];
+    return Array.isArray(parsed) ? parsed.slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveFilterPresets(presets: FilterPreset[]) {
+  localStorage.setItem(FILTER_PRESETS_KEY, JSON.stringify(presets.slice(0, 8)));
+}
+
+function roleDefaultStatuses(role: string | undefined): string[] | null {
+  if (role === "surveyor") return ["draft", "priced", "review_required"];
+  if (role === "office") return ["ready_to_quote", "quoted"];
+  if (role === "accounts") return ["accepted", "quoted"];
+  return null;
+}
 
 const SORT_OPTIONS: Array<{ value: EstimateSort; label: string }> = [
   { value: "created_at_desc", label: "Newest first" },
@@ -38,38 +68,6 @@ const SORT_OPTIONS: Array<{ value: EstimateSort; label: string }> = [
 ];
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
-
-const LOCKED_STATUSES = new Set([
-  "quoted",
-  "accepted",
-  "declined",
-  "expired",
-  "closed",
-]);
-
-function formatStatus(status: string) {
-  return status.replaceAll("_", " ");
-}
-
-function statusTone(status: string) {
-  switch (status) {
-    case "ready_to_quote":
-      return "is-ready";
-    case "quoted":
-    case "accepted":
-      return "is-success";
-    case "review_required":
-      return "is-warning";
-    case "priced":
-      return "is-priced";
-    default:
-      return "";
-  }
-}
-
-function actionLabel(status: string) {
-  return LOCKED_STATUSES.has(status) ? "Open" : "Edit";
-}
 
 function parseFilters(params: URLSearchParams): EstimateSearchFilters {
   const sellMin = params.get("sell_min");
@@ -137,6 +135,11 @@ export default function DashboardPage() {
   const [actualsSummary, setActualsSummary] = useState<ActualsSummary | null>(
     null,
   );
+  const [opsSummary, setOpsSummary] = useState<OpsSummary | null>(null);
+  const [filterPresets, setFilterPresets] = useState<FilterPreset[]>(() =>
+    loadFilterPresets(),
+  );
+  const user = getStoredUser();
 
   const activeFilterCount = countActiveFilters(filters);
   const exportUrl = estimatesListCsvUrl(filters);
@@ -145,6 +148,18 @@ export default function DashboardPage() {
   useEffect(() => {
     setDraftQ(filters.q || "");
   }, [filters.q]);
+
+  useEffect(() => {
+    if (searchParams.toString()) return;
+    const role = user?.role;
+    const defaults = roleDefaultStatuses(role);
+    if (!defaults?.length) return;
+    const marker = `${ROLE_DEFAULT_APPLIED_KEY}:${role || "unknown"}`;
+    if (sessionStorage.getItem(marker)) return;
+    sessionStorage.setItem(marker, "1");
+    updateParams({ status: defaults }, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply once per session when landing with empty filters
+  }, []);
 
   useEffect(() => {
     if ((draftQ || "") === (filters.q || "")) return;
@@ -161,10 +176,11 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        const [health, result, summary] = await Promise.all([
+        const [health, result, summary, ops] = await Promise.all([
           getHealth(),
           searchEstimates(filters),
           getActualsSummary(12).catch(() => null),
+          getOpsSummary().catch(() => null),
         ]);
         if (cancelled) return;
         setApiOk(health.status === "ok" && health.database_ok !== false);
@@ -181,6 +197,7 @@ export default function DashboardPage() {
         setHasNext(result.has_next);
         setHasPrev(result.has_prev);
         setActualsSummary(summary);
+        setOpsSummary(ops);
       } catch (err) {
         if (cancelled) return;
         setApiOk(false);
@@ -266,6 +283,55 @@ export default function DashboardPage() {
     updateParams({ status: Array.from(current) }, true);
   }
 
+  function applyPreset(preset: FilterPreset) {
+    setDraftQ(preset.filters.q || "");
+    setShowAdvanced(countActiveFilters(preset.filters) > (preset.filters.q ? 1 : 0));
+    setSearchParams(() => {
+      const next = new URLSearchParams();
+      const patch = preset.filters;
+      if (patch.q) next.set("q", patch.q);
+      for (const status of patch.status || []) next.append("status", status);
+      if (patch.surveyor) next.set("surveyor", patch.surveyor);
+      if (patch.survey_from) next.set("survey_from", patch.survey_from);
+      if (patch.survey_to) next.set("survey_to", patch.survey_to);
+      if (patch.sell_min != null) next.set("sell_min", String(patch.sell_min));
+      if (patch.sell_max != null) next.set("sell_max", String(patch.sell_max));
+      if (patch.sort) next.set("sort", patch.sort);
+      if (patch.page_size) next.set("page_size", String(patch.page_size));
+      next.set("page", "1");
+      return next;
+    }, { replace: true });
+  }
+
+  function saveCurrentPreset() {
+    const name = window.prompt("Name this filter preset");
+    if (!name?.trim()) return;
+    const preset: FilterPreset = {
+      id: `${Date.now()}`,
+      name: name.trim().slice(0, 40),
+      filters: {
+        q: filters.q,
+        status: filters.status,
+        surveyor: filters.surveyor,
+        survey_from: filters.survey_from,
+        survey_to: filters.survey_to,
+        sell_min: filters.sell_min,
+        sell_max: filters.sell_max,
+        sort: filters.sort,
+        page_size: filters.page_size,
+      },
+    };
+    const next = [preset, ...filterPresets.filter((row) => row.name !== preset.name)];
+    setFilterPresets(next);
+    saveFilterPresets(next);
+  }
+
+  function removePreset(id: string) {
+    const next = filterPresets.filter((row) => row.id !== id);
+    setFilterPresets(next);
+    saveFilterPresets(next);
+  }
+
   function setColumnSort(asc: EstimateSort, desc: EstimateSort) {
     updateParams({ sort: nextSort(currentSort, asc, desc) }, true);
   }
@@ -279,7 +345,15 @@ export default function DashboardPage() {
         <h1 className="page-title">Estimates</h1>
         <p className="page-lead">
           Search, filter, and open saved estimates or create a new one from site
-          survey details.
+          survey details
+          {user?.role === "surveyor"
+            ? " · showing your active draft pipeline by default"
+            : user?.role === "office"
+              ? " · focused on ready-to-quote and quoted work"
+              : user?.role === "accounts"
+                ? " · focused on accepted and quoted commercial work"
+                : ""}
+          .
         </p>
       </div>
 
@@ -310,19 +384,72 @@ export default function DashboardPage() {
                 <Spinner
                   size="sm"
                   className="api-status-spinner"
-                  label="Checking system"
+                  label="Checking connection"
                 />
-                Checking system…
+                Checking…
               </>
             ) : (
               <>
-                System {apiOk ? "connected" : "offline"}
+                {apiOk ? "Online" : "Offline"}
                 {healthDetail && apiOk ? ` · ${healthDetail}` : ""}
               </>
             )}
           </span>
         </div>
       </div>
+
+      {opsSummary ? (
+        <div className="ops-count-grid" aria-label="Estimate pipeline counts">
+          <button
+            type="button"
+            className="ops-count-card"
+            onClick={() => updateParams({ status: undefined }, true)}
+          >
+            <span className="ops-count-label">All</span>
+            <strong className="ops-count-value">{opsSummary.total}</strong>
+          </button>
+          <button
+            type="button"
+            className="ops-count-card"
+            onClick={() => updateParams({ status: ["draft"] }, true)}
+          >
+            <span className="ops-count-label">Draft</span>
+            <strong className="ops-count-value">{opsSummary.draft}</strong>
+          </button>
+          <button
+            type="button"
+            className="ops-count-card"
+            onClick={() => updateParams({ status: ["review_required"] }, true)}
+          >
+            <span className="ops-count-label">Review</span>
+            <strong className="ops-count-value">{opsSummary.review_required}</strong>
+          </button>
+          <button
+            type="button"
+            className="ops-count-card"
+            onClick={() => updateParams({ status: ["ready_to_quote"] }, true)}
+          >
+            <span className="ops-count-label">Ready to quote</span>
+            <strong className="ops-count-value">{opsSummary.ready_to_quote}</strong>
+          </button>
+          <button
+            type="button"
+            className="ops-count-card"
+            onClick={() => updateParams({ status: ["quoted"] }, true)}
+          >
+            <span className="ops-count-label">Quoted</span>
+            <strong className="ops-count-value">{opsSummary.quoted}</strong>
+          </button>
+          <button
+            type="button"
+            className="ops-count-card"
+            onClick={() => updateParams({ status: ["accepted"] }, true)}
+          >
+            <span className="ops-count-label">Accepted</span>
+            <strong className="ops-count-value">{opsSummary.accepted}</strong>
+          </button>
+        </div>
+      ) : null}
 
       {actualsSummary && actualsSummary.count > 0 ? (
         <div className="panel stack">
@@ -458,8 +585,41 @@ export default function DashboardPage() {
                 Clear all
               </button>
             ) : null}
+            {activeFilterCount > 0 ? (
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={saveCurrentPreset}
+              >
+                Save preset
+              </button>
+            ) : null}
           </div>
         </div>
+
+        {filterPresets.length ? (
+          <div className="active-filter-chips" aria-label="Saved filter presets">
+            {filterPresets.map((preset) => (
+              <span key={preset.id} className="preset-chip-wrap">
+                <button
+                  type="button"
+                  className="active-filter-chip"
+                  onClick={() => applyPreset(preset)}
+                >
+                  {preset.name}
+                </button>
+                <button
+                  type="button"
+                  className="preset-chip-remove"
+                  aria-label={`Remove preset ${preset.name}`}
+                  onClick={() => removePreset(preset.id)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         <div className="estimate-search-quick row">
           <div className="field estimate-search-field">
@@ -591,6 +751,100 @@ export default function DashboardPage() {
             </div>
           </div>
         ) : null}
+
+        {activeFilterCount > 0 ? (
+          <div className="active-filter-chips" aria-label="Active filters">
+            {filters.q ? (
+              <button
+                type="button"
+                className="active-filter-chip"
+                onClick={() => {
+                  setDraftQ("");
+                  updateParams({ q: undefined }, true);
+                }}
+              >
+                Search: {filters.q}
+                <span aria-hidden>×</span>
+              </button>
+            ) : null}
+            {(filters.status || []).map((status) => (
+              <button
+                key={status}
+                type="button"
+                className="active-filter-chip"
+                onClick={() => toggleStatus(status)}
+              >
+                Status: {formatEstimateStatus(status)}
+                <span aria-hidden>×</span>
+              </button>
+            ))}
+            {filters.surveyor ? (
+              <button
+                type="button"
+                className="active-filter-chip"
+                onClick={() => updateParams({ surveyor: undefined }, true)}
+              >
+                Surveyor: {filters.surveyor}
+                <span aria-hidden>×</span>
+              </button>
+            ) : null}
+            {filters.survey_from || filters.survey_to ? (
+              <button
+                type="button"
+                className="active-filter-chip"
+                onClick={() =>
+                  updateParams(
+                    { survey_from: undefined, survey_to: undefined },
+                    true,
+                  )
+                }
+              >
+                Survey date:{" "}
+                {[
+                  filters.survey_from
+                    ? formatUkDate(filters.survey_from)
+                    : "…",
+                  filters.survey_to ? formatUkDate(filters.survey_to) : "…",
+                ].join(" – ")}
+                <span aria-hidden>×</span>
+              </button>
+            ) : null}
+            {filters.sell_min != null || filters.sell_max != null ? (
+              <button
+                type="button"
+                className="active-filter-chip"
+                onClick={() =>
+                  updateParams({ sell_min: undefined, sell_max: undefined }, true)
+                }
+              >
+                Sell:{" "}
+                {[
+                  filters.sell_min != null
+                    ? formatMoney(filters.sell_min)
+                    : "…",
+                  filters.sell_max != null
+                    ? formatMoney(filters.sell_max)
+                    : "…",
+                ].join(" – ")}
+                <span aria-hidden>×</span>
+              </button>
+            ) : null}
+            {filters.sort && filters.sort !== "created_at_desc" ? (
+              <button
+                type="button"
+                className="active-filter-chip"
+                onClick={() =>
+                  updateParams({ sort: "created_at_desc" }, true)
+                }
+              >
+                Sort:{" "}
+                {SORT_OPTIONS.find((option) => option.value === filters.sort)
+                  ?.label || filters.sort}
+                <span aria-hidden>×</span>
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </form>
 
       {error ? <div className="error-banner">{error}</div> : null}
@@ -636,16 +890,26 @@ export default function DashboardPage() {
             <strong>
               {activeFilterCount > 0 ? "No matching estimates" : "No estimates yet"}
             </strong>
-            {activeFilterCount > 0
-              ? "Try clearing filters or broadening your search terms."
-              : "Create the first draft from customer and site details."}
-            {activeFilterCount === 0 ? (
-              <div className="step-actions" style={{ justifyContent: "center" }}>
+            <p>
+              {activeFilterCount > 0
+                ? "No estimates match these filters."
+                : "Create the first draft from customer and site details."}
+            </p>
+            <div className="step-actions" style={{ justifyContent: "center" }}>
+              {activeFilterCount > 0 ? (
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={clearFilters}
+                >
+                  Clear filters
+                </button>
+              ) : (
                 <Link className="btn btn-primary" to="/estimates/new">
                   New estimate
                 </Link>
-              </div>
-            ) : null}
+              )}
+            </div>
           </div>
         ) : (
           <div className="estimates-table-wrap">
@@ -685,8 +949,12 @@ export default function DashboardPage() {
                     </button>
                   </th>
                   <th scope="col">Site</th>
-                  <th scope="col">Surveyor</th>
-                  <th scope="col">Survey</th>
+                  <th scope="col" className="is-secondary">
+                    Surveyor
+                  </th>
+                  <th scope="col" className="is-secondary">
+                    Survey
+                  </th>
                   <th scope="col">Status</th>
                   <th scope="col" className="is-num">
                     <button
@@ -742,22 +1010,20 @@ export default function DashboardPage() {
                     <td data-label="Site">
                       <div className="estimate-site-cell">{siteLine(estimate)}</div>
                     </td>
-                    <td data-label="Surveyor">
+                    <td data-label="Surveyor" className="is-secondary">
                       {estimate.surveyor || (
                         <span className="muted">—</span>
                       )}
                     </td>
-                    <td data-label="Survey">
-                      {estimate.survey_date || (
+                    <td data-label="Survey" className="is-secondary">
+                      {estimate.survey_date ? (
+                        formatUkDate(estimate.survey_date)
+                      ) : (
                         <span className="muted">—</span>
                       )}
                     </td>
                     <td data-label="Status">
-                      <span
-                        className={`status-pill ${statusTone(estimate.status)}`}
-                      >
-                        {formatStatus(estimate.status)}
-                      </span>
+                      <StatusPill status={estimate.status} />
                     </td>
                     <td data-label="Sell" className="is-num money">
                       {formatMoney(estimate.sell_price)}
@@ -782,7 +1048,7 @@ export default function DashboardPage() {
                         className="btn btn-secondary btn-compact"
                         to={`/estimates/${estimate.id}`}
                       >
-                        {actionLabel(estimate.status)}
+                        {estimateOpenActionLabel(estimate.status)}
                       </Link>
                     </td>
                   </tr>

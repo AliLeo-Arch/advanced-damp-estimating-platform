@@ -19,6 +19,14 @@ WORK_TYPE_LABELS = {
     "ventilation_installation": "Ventilation Equipment",
 }
 
+WORK_TYPE_CATEGORIES = {
+    "injection_replaster": "Damp proofing",
+    "membrane_waterproofing": "Waterproofing",
+    "pump_package": "Waterproofing",
+    "timber_remediation": "Timber",
+    "ventilation_installation": "Ventilation",
+}
+
 
 def _load_seed() -> dict:
     return json.loads(SEED_PATH.read_text(encoding="utf-8"))

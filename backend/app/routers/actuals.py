@@ -38,7 +38,17 @@ def _get_or_create_actuals(db: Session, estimate_id: int) -> EstimateActuals:
     row = db.query(EstimateActuals).filter(EstimateActuals.estimate_id == estimate_id).first()
     if row:
         return row
-    row = EstimateActuals(estimate_id=estimate_id)
+    row = EstimateActuals(
+        estimate_id=estimate_id,
+        materials_actual=None,
+        labour_actual=None,
+        waste_actual=None,
+        travel_actual=None,
+        prelims_actual=None,
+        other_actual=None,
+        revenue_actual=None,
+        notes="",
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -46,17 +56,23 @@ def _get_or_create_actuals(db: Session, estimate_id: int) -> EstimateActuals:
 
 
 def _serialize(estimate: Estimate, actuals: EstimateActuals) -> ActualsRead:
+    from app.actuals import normalize_actuals_values
+
+    view = normalize_actuals_values(actuals)
     comparison = build_comparison(estimate, actuals)
     return ActualsRead(
         estimate_id=estimate.id,
-        materials_actual=actuals.materials_actual or 0,
-        labour_actual=actuals.labour_actual or 0,
-        waste_actual=actuals.waste_actual or 0,
-        travel_actual=actuals.travel_actual or 0,
-        prelims_actual=actuals.prelims_actual or 0,
-        other_actual=actuals.other_actual or 0,
-        revenue_actual=actuals.revenue_actual,
-        notes=actuals.notes or "",
+        materials_actual=view.materials_actual,
+        labour_actual=view.labour_actual,
+        waste_actual=view.waste_actual,
+        travel_actual=view.travel_actual,
+        prelims_actual=view.prelims_actual,
+        other_actual=view.other_actual,
+        revenue_actual=view.revenue_actual,
+        notes=view.notes,
+        status=comparison.status,
+        categories_entered=comparison.categories_entered,
+        categories_total=comparison.categories_total,
         comparison=comparison_to_dict(comparison),
     )
 
@@ -82,22 +98,15 @@ def actuals_summary(
         actuals = estimate.actuals
         if not actuals:
             continue
-        # Skip untouched zero rows so the dashboard shows meaningful jobs only.
-        touched = any(
-            [
-                actuals.materials_actual,
-                actuals.labour_actual,
-                actuals.waste_actual,
-                actuals.travel_actual,
-                actuals.prelims_actual,
-                actuals.other_actual,
-                actuals.revenue_actual is not None,
-                (actuals.notes or "").strip(),
-            ]
-        )
-        if not touched:
-            continue
+        # Only complete actuals contribute definitive margin KPIs.
         comparison = build_comparison(estimate, actuals)
+        if comparison.status != "complete":
+            continue
+        if (
+            comparison.total_cost.actual is None
+            or comparison.actual_margin_percent is None
+        ):
+            continue
         items.append(
             ActualsSummaryItem(
                 estimate_id=estimate.id,
@@ -106,12 +115,12 @@ def actuals_summary(
                 status=estimate.status,
                 estimated_cost=comparison.total_cost.estimated,
                 actual_cost=comparison.total_cost.actual,
-                cost_variance=comparison.total_cost.variance,
+                cost_variance=comparison.total_cost.variance or 0.0,
                 estimated_revenue=comparison.revenue.estimated,
-                actual_revenue=comparison.revenue.actual,
+                actual_revenue=comparison.revenue.actual or comparison.revenue.estimated,
                 estimated_margin_percent=comparison.estimated_margin_percent,
                 actual_margin_percent=comparison.actual_margin_percent,
-                margin_percent_variance=comparison.margin_percent_variance,
+                margin_percent_variance=comparison.margin_percent_variance or 0.0,
             )
         )
 

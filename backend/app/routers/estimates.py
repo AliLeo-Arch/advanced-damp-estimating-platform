@@ -7,6 +7,7 @@ from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.audit import write_audit
@@ -48,7 +49,7 @@ from app.schemas import (
     EstimateUpdate,
     QuotationRead,
 )
-from app.seed import WORK_TYPE_LABELS
+from app.seed import WORK_TYPE_CATEGORIES, WORK_TYPE_LABELS
 
 router = APIRouter(prefix="/estimates", tags=["estimates"])
 
@@ -143,7 +144,11 @@ def list_work_types(
     _: User = Depends(get_current_user),
 ) -> list[dict]:
     return [
-        {"code": code, "label": label}
+        {
+            "code": code,
+            "label": label,
+            "category": WORK_TYPE_CATEGORIES.get(code, "General"),
+        }
         for code, label in WORK_TYPE_LABELS.items()
     ]
 
@@ -165,6 +170,37 @@ def list_estimates(
         has_next=bool(meta["has_next"]),
         has_prev=bool(meta["has_prev"]),
     )
+
+
+@router.get("/ops-summary")
+def estimate_ops_summary(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> dict:
+    rows = (
+        db.query(Estimate.status, func.count(Estimate.id))
+        .group_by(Estimate.status)
+        .all()
+    )
+    by_status = {str(status): int(count) for status, count in rows}
+    total = sum(by_status.values())
+    return {
+        "total": total,
+        "by_status": by_status,
+        "draft": by_status.get(EstimateStatus.DRAFT.value, 0),
+        "priced": by_status.get(EstimateStatus.PRICED.value, 0),
+        "review_required": by_status.get(EstimateStatus.REVIEW_REQUIRED.value, 0),
+        "ready_to_quote": by_status.get(EstimateStatus.READY_TO_QUOTE.value, 0),
+        "quoted": by_status.get(EstimateStatus.QUOTED.value, 0),
+        "accepted": by_status.get(EstimateStatus.ACCEPTED.value, 0),
+        "active_pipeline": (
+            by_status.get(EstimateStatus.DRAFT.value, 0)
+            + by_status.get(EstimateStatus.PRICED.value, 0)
+            + by_status.get(EstimateStatus.REVIEW_REQUIRED.value, 0)
+            + by_status.get(EstimateStatus.APPROVED.value, 0)
+            + by_status.get(EstimateStatus.READY_TO_QUOTE.value, 0)
+        ),
+    }
 
 
 @router.get("/export/list.csv")
@@ -238,6 +274,29 @@ def get_estimate(
     _: User = Depends(get_current_user),
 ) -> EstimateRead:
     return serialize_estimate(_get_estimate_or_404(estimate_id, db))
+
+
+@router.get("/{estimate_id}/family", response_model=list[EstimateRead])
+def estimate_family(
+    estimate_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> list[EstimateRead]:
+    """Return the revision/quotation family for an estimate."""
+    estimate = _get_estimate_or_404(estimate_id, db)
+    base_ref = estimate.reference.split("-R")[0]
+    rows = (
+        db.query(Estimate)
+        .filter(
+            or_(
+                Estimate.reference == base_ref,
+                Estimate.reference.like(f"{base_ref}-R%"),
+            )
+        )
+        .order_by(Estimate.revision_no.asc(), Estimate.created_at.asc())
+        .all()
+    )
+    return [serialize_estimate(row) for row in rows]
 
 
 @router.put("/{estimate_id}", response_model=EstimateRead)
@@ -493,6 +552,14 @@ def download_quotation_pdf(
 ):
     estimate = _get_estimate_or_404(estimate_id, db)
     quote = build_quotation(db, estimate)
+    if not quote.lines_reconciled:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Quotation amounts do not reconcile. Recalculate pricing before "
+                "exporting the customer PDF."
+            ),
+        )
     buffer, filename = render_quotation_pdf(quote)
     return StreamingResponse(
         buffer,

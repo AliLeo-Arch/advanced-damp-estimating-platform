@@ -1,28 +1,21 @@
-import { FormEvent, Fragment, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { PanelSkeleton } from "../components/Loading";
+import SideDrawer from "../components/SideDrawer";
 import {
   createRate,
   formatMoney,
-  getPricingSettings,
   listRateCategories,
   listRateVersions,
-  PricingSettings,
   RateItem,
   RateSort,
   RateVersion,
   searchRates,
-  updatePricingSettings,
   updateRate,
 } from "../api";
 import { getStoredUser } from "../auth";
-
-const WORK_TYPE_LABELS: Record<string, string> = {
-  injection_replaster: "Injection Treatment & Replastering",
-  membrane_waterproofing: "Membrane Waterproofing System",
-  pump_package: "Pump / Drainage Package",
-  timber_remediation: "Timber Remedial Treatment",
-  ventilation_installation: "Ventilation Equipment",
-};
+import { formatUkDate, formatUkDateTime } from "../locale";
 
 const FALLBACK_CATEGORIES = [
   "materials",
@@ -49,6 +42,11 @@ const SORT_OPTIONS: Array<{ value: RateSort; label: string }> = [
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
+type RateDrawer =
+  | { mode: "add" }
+  | { mode: "edit"; rate: RateItem }
+  | { mode: "history"; rate: RateItem };
+
 function formatCategory(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
@@ -62,7 +60,6 @@ export default function RatesPage() {
 
   const [rates, setRates] = useState<RateItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [settings, setSettings] = useState<PricingSettings | null>(null);
   const [searchQ, setSearchQ] = useState("");
   const [draftQ, setDraftQ] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
@@ -74,23 +71,86 @@ export default function RatesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [historyId, setHistoryId] = useState<number | null>(null);
+  const [drawer, setDrawer] = useState<RateDrawer | null>(null);
   const [historyRows, setHistoryRows] = useState<RateVersion[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [pendingRateConfirm, setPendingRateConfirm] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    tone?: "primary" | "danger";
+    run: () => Promise<void>;
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const categoryOptions = useMemo(() => {
     const merged = new Set([...FALLBACK_CATEGORIES, ...categories]);
     return Array.from(merged).sort();
   }, [categories]);
 
+  async function importRatesCsv(file: File) {
+    setError(null);
+    setMessage(null);
+    setSaving(true);
+    try {
+      const text = await file.text();
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (lines.length < 2) {
+        throw new Error("CSV needs a header row and at least one rate.");
+      }
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+      const idx = (name: string) => headers.indexOf(name);
+      const required = ["code", "name", "category", "cost_per_unit"] as const;
+      for (const key of required) {
+        if (idx(key) < 0) {
+          throw new Error(`CSV missing required column: ${key}`);
+        }
+      }
+      let created = 0;
+      for (const line of lines.slice(1)) {
+        const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+        const code = cols[idx("code")];
+        const name = cols[idx("name")];
+        const category = cols[idx("category")];
+        const cost = Number(cols[idx("cost_per_unit")]);
+        if (!code || !name || !category || Number.isNaN(cost)) continue;
+        await createRate({
+          code,
+          name,
+          category,
+          unit: idx("unit") >= 0 ? cols[idx("unit")] || "each" : "each",
+          cost_per_unit: cost,
+          waste_percent:
+            idx("waste_percent") >= 0
+              ? Number(cols[idx("waste_percent")] || 0)
+              : 0,
+          notes: idx("notes") >= 0 ? cols[idx("notes")] || "" : "",
+          active: true,
+        });
+        created += 1;
+      }
+      await refresh();
+      setMessage(
+        created
+          ? `Imported ${created} rate${created === 1 ? "" : "s"} from CSV.`
+          : "No valid rate rows found in the CSV.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "CSV import failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function refresh() {
-    const [result, cats, pricing] = await Promise.all([
+    const [result, cats] = await Promise.all([
       searchRates({
         q: searchQ || undefined,
         category: filterCategory || undefined,
@@ -100,7 +160,6 @@ export default function RatesPage() {
         page_size: pageSize,
       }),
       listRateCategories(),
-      getPricingSettings(),
     ]);
     setRates(result.items);
     setTotal(result.total);
@@ -110,7 +169,6 @@ export default function RatesPage() {
     setHasNext(result.has_next);
     setHasPrev(result.has_prev);
     setCategories(cats);
-    setSettings(pricing);
   }
 
   useEffect(() => {
@@ -171,7 +229,7 @@ export default function RatesPage() {
       });
       event.currentTarget.reset();
       setMessage("Rate created.");
-      setShowAddForm(false);
+      setDrawer(null);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create rate");
@@ -199,12 +257,9 @@ export default function RatesPage() {
         change_reason: String(form.get("change_reason") || "").trim() || undefined,
         effective_date: String(form.get("effective_date") || "").trim() || undefined,
       });
-      setEditingId(null);
+      setDrawer(null);
       setMessage(`Updated ${rate.code}.`);
       await refresh();
-      if (historyId === rate.id) {
-        await loadHistory(rate.id);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not update rate");
     } finally {
@@ -212,13 +267,14 @@ export default function RatesPage() {
     }
   }
 
-  async function loadHistory(rateId: number) {
+  async function openHistory(rate: RateItem) {
+    setDrawer({ mode: "history", rate });
     setHistoryLoading(true);
+    setHistoryRows([]);
     setError(null);
     try {
-      const rows = await listRateVersions(rateId);
+      const rows = await listRateVersions(rate.id);
       setHistoryRows(rows);
-      setHistoryId(rateId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load rate history");
     } finally {
@@ -226,13 +282,9 @@ export default function RatesPage() {
     }
   }
 
-  async function toggleHistory(rate: RateItem) {
-    if (historyId === rate.id) {
-      setHistoryId(null);
-      setHistoryRows([]);
-      return;
-    }
-    await loadHistory(rate.id);
+  function closeDrawer() {
+    setDrawer(null);
+    setHistoryRows([]);
   }
 
   async function toggleActive(rate: RateItem) {
@@ -250,52 +302,47 @@ export default function RatesPage() {
     }
   }
 
-  async function onSaveSettings(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canManageSettings || !settings) return;
-    setError(null);
-    setMessage(null);
-    setSaving(true);
-    const form = new FormData(event.currentTarget);
-    const margins: Record<string, number> = {};
-    for (const key of Object.keys(WORK_TYPE_LABELS)) {
-      margins[key] = Number(form.get(`margin_${key}`) || 0);
-    }
-    try {
-      const updated = await updatePricingSettings({
-        minimum_job_value: Number(form.get("minimum_job_value") || 0),
-        vat_rate: Number(form.get("vat_rate") || 0) / 100,
-        quote_validity_days: Number(form.get("quote_validity_days") || 30),
-        payment_terms: String(form.get("payment_terms") || ""),
-        min_permitted_margin_percent: Number(
-          form.get("min_permitted_margin_percent") || 20,
-        ),
-        survey_fee_default: Number(form.get("survey_fee_default") || 195),
-        margins_by_work_type: margins,
-        company_display_name: String(form.get("company_display_name") || ""),
-        company_phone: String(form.get("company_phone") || ""),
-        company_email: String(form.get("company_email") || ""),
-        company_address: String(form.get("company_address") || ""),
-        company_website: String(form.get("company_website") || ""),
-        company_tagline: String(form.get("company_tagline") || ""),
-        quote_prefix: String(form.get("quote_prefix") || "EST"),
+  function requestToggleActive(rate: RateItem) {
+    if (!canManageRates) return;
+    if (rate.active) {
+      setPendingRateConfirm({
+        title: "Deactivate rate?",
+        message: `${rate.code} will no longer be available for new estimates. Existing quotations keep their locked rate snapshot.`,
+        confirmLabel: "Deactivate rate",
+        tone: "danger",
+        run: () => toggleActive(rate),
       });
-      setSettings(updated);
-      setMessage("Commercial settings saved.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save settings");
+      return;
+    }
+    void toggleActive(rate);
+  }
+
+  async function runPendingRateConfirm() {
+    if (!pendingRateConfirm) return;
+    setConfirmBusy(true);
+    try {
+      await pendingRateConfirm.run();
+      setPendingRateConfirm(null);
     } finally {
-      setSaving(false);
+      setConfirmBusy(false);
     }
   }
 
-  if (!canManageRates && !canManageSettings) {
+  if (!canManageRates) {
     return (
       <section className="stack">
         <div className="page-header">
-          <h1 className="page-title">Rates &amp; commercial settings</h1>
+          <h1 className="page-title">Rates</h1>
           <p className="page-lead">
-            Only owner and admin users can manage rates and pricing settings.
+            Only users with rate administration permission can manage the rate
+            library.
+            {canManageSettings ? (
+              <>
+                {" "}
+                Company and commercial rules are in{" "}
+                <Link to="/settings">Settings</Link>.
+              </>
+            ) : null}
           </p>
         </div>
         <div className="error-banner">You do not have permission to view this page.</div>
@@ -307,10 +354,9 @@ export default function RatesPage() {
     return (
       <section className="stack" aria-busy="true" aria-live="polite">
         <div className="page-header">
-          <h1 className="page-title">Rates &amp; commercial settings</h1>
-          <p className="page-lead">Loading commercial rates and settings…</p>
+          <h1 className="page-title">Rates</h1>
+          <p className="page-lead">Loading rate library…</p>
         </div>
-        <PanelSkeleton rows={5} />
         <PanelSkeleton rows={8} />
       </section>
     );
@@ -319,215 +365,59 @@ export default function RatesPage() {
   return (
     <section className="stack">
       <div className="page-header">
-        <h1 className="page-title">Rates &amp; commercial settings</h1>
+        <h1 className="page-title">Rates</h1>
         <p className="page-lead">
-          Maintain cost rates, target margins, and minimum job policy. Seed figures
-          are synthetic demo placeholders — replace with live supplier and labour
-          rates before production use.
+          Maintain materials, labour, packages, travel, waste, and preliminaries
+          costs. Cost changes are versioned with reason and effective date.
+          {canManageSettings ? (
+            <>
+              {" "}
+              Company profile and commercial rules are in{" "}
+              <Link to="/settings">Settings</Link>.
+            </>
+          ) : null}
         </p>
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
       {message ? <div className="info-banner">{message}</div> : null}
 
-      {canManageSettings && settings ? (
-        <form className="panel stack" onSubmit={onSaveSettings}>
-          <h2 className="panel-title">Company profile</h2>
-          <p className="muted">
-            Used on quotations, PDF letterhead, and the application footer.
-          </p>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="company_display_name">Company name</label>
-              <input
-                id="company_display_name"
-                name="company_display_name"
-                defaultValue={settings.company_display_name || ""}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="quote_prefix">Quote prefix</label>
-              <input
-                id="quote_prefix"
-                name="quote_prefix"
-                defaultValue={settings.quote_prefix || "EST"}
-                maxLength={20}
-                required
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="company_phone">Phone</label>
-              <input
-                id="company_phone"
-                name="company_phone"
-                defaultValue={settings.company_phone || ""}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="company_email">Email</label>
-              <input
-                id="company_email"
-                name="company_email"
-                type="email"
-                defaultValue={settings.company_email || ""}
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="company_address">Address</label>
-            <input
-              id="company_address"
-              name="company_address"
-              defaultValue={settings.company_address || ""}
-            />
-          </div>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="company_website">Website</label>
-              <input
-                id="company_website"
-                name="company_website"
-                defaultValue={settings.company_website || ""}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="company_tagline">Quotation tagline</label>
-              <input
-                id="company_tagline"
-                name="company_tagline"
-                defaultValue={settings.company_tagline || ""}
-              />
-            </div>
-          </div>
-
-          <h2 className="panel-title">Commercial settings</h2>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="minimum_job_value">Minimum job value (£)</label>
-              <input
-                id="minimum_job_value"
-                name="minimum_job_value"
-                type="number"
-                min={0}
-                step="1"
-                defaultValue={settings.minimum_job_value}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="min_permitted_margin_percent">
-                Min permitted margin (%)
-              </label>
-              <input
-                id="min_permitted_margin_percent"
-                name="min_permitted_margin_percent"
-                type="number"
-                min={0}
-                max={100}
-                step="0.1"
-                defaultValue={settings.min_permitted_margin_percent ?? 20}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="vat_rate">VAT rate (%)</label>
-              <input
-                id="vat_rate"
-                name="vat_rate"
-                type="number"
-                min={0}
-                max={100}
-                step="0.1"
-                defaultValue={(settings.vat_rate * 100).toFixed(1)}
-                required
-              />
-            </div>
-          </div>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="quote_validity_days">Quote validity (days)</label>
-              <input
-                id="quote_validity_days"
-                name="quote_validity_days"
-                type="number"
-                min={1}
-                defaultValue={settings.quote_validity_days}
-                required
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="survey_fee_default">Default survey fee (£)</label>
-              <input
-                id="survey_fee_default"
-                name="survey_fee_default"
-                type="number"
-                min={0}
-                step="1"
-                defaultValue={settings.survey_fee_default ?? 195}
-                required
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="payment_terms">Payment terms</label>
-            <textarea
-              id="payment_terms"
-              name="payment_terms"
-              rows={2}
-              defaultValue={settings.payment_terms}
-            />
-          </div>
-          <h3 className="panel-title">Target margins by work type (%)</h3>
-          <div className="row">
-            {Object.entries(WORK_TYPE_LABELS).map(([key, label]) => (
-              <div className="field" key={key}>
-                <label htmlFor={`margin_${key}`}>{label}</label>
-                <input
-                  id={`margin_${key}`}
-                  name={`margin_${key}`}
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="0.1"
-                  defaultValue={settings.margins_by_work_type[key] ?? 30}
-                  required
-                />
-              </div>
-            ))}
-          </div>
-          <div className="step-actions">
-            <button className="btn btn-primary" type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save settings"}
-            </button>
-          </div>
-        </form>
-      ) : null}
-
-      {canManageRates ? (
-        <>
+      <>
           <div className="panel stack rate-table-panel">
             <div className="rate-table-header">
               <div>
                 <h2 className="panel-title" style={{ margin: 0 }}>
-                  Rate table
+                  Rate library
                 </h2>
                 <p className="muted rate-table-lead">
                   {total} rate{total === 1 ? "" : "s"} across{" "}
-                  {categoryOptions.length} categories. Cost changes are versioned
-                  with an optional reason and effective date.
+                  {categoryOptions.length} categories. CSV import expects
+                  columns: code, name, category, cost_per_unit (optional: unit,
+                  waste_percent, notes).
                 </p>
               </div>
               <div className="rate-table-header-actions">
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-primary"
                   type="button"
-                  onClick={() => setShowAddForm((open) => !open)}
+                  onClick={() => setDrawer({ mode: "add" })}
                 >
-                  {showAddForm ? "Hide add form" : "Add rate"}
+                  Add rate
                 </button>
+                <label className="btn btn-secondary" style={{ cursor: "pointer" }}>
+                  Import CSV
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    hidden
+                    disabled={saving}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (file) void importRatesCsv(file);
+                    }}
+                  />
+                </label>
                 {hasFilters ? (
                   <button className="btn btn-secondary" type="button" onClick={resetFilters}>
                     Clear filters
@@ -535,75 +425,6 @@ export default function RatesPage() {
                 ) : null}
               </div>
             </div>
-
-            {showAddForm ? (
-              <form className="rate-add-form stack" onSubmit={onCreateRate}>
-                <h3 className="rate-add-title">New rate</h3>
-                <div className="row">
-                  <div className="field">
-                    <label htmlFor="code">Code</label>
-                    <input id="code" name="code" required placeholder="MAT-EXAMPLE" />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="name">Name</label>
-                    <input id="name" name="name" required />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="category">Category</label>
-                    <input
-                      id="category"
-                      name="category"
-                      list="rate-categories"
-                      required
-                      placeholder="materials"
-                    />
-                    <datalist id="rate-categories">
-                      {categoryOptions.map((cat) => (
-                        <option key={cat} value={cat} />
-                      ))}
-                    </datalist>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="field">
-                    <label htmlFor="unit">Unit</label>
-                    <input id="unit" name="unit" defaultValue="each" />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="cost_per_unit">Cost per unit (£)</label>
-                    <input
-                      id="cost_per_unit"
-                      name="cost_per_unit"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="waste_percent">Waste %</label>
-                    <input
-                      id="waste_percent"
-                      name="waste_percent"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step="0.1"
-                      defaultValue={0}
-                    />
-                  </div>
-                </div>
-                <div className="field">
-                  <label htmlFor="notes">Notes</label>
-                  <input id="notes" name="notes" />
-                </div>
-                <div className="step-actions">
-                  <button className="btn btn-primary" type="submit" disabled={saving}>
-                    Add rate
-                  </button>
-                </div>
-              </form>
-            ) : null}
 
             <div className="rate-table-toolbar row row-align-end">
               <div className="field rate-search-field">
@@ -735,255 +556,96 @@ export default function RatesPage() {
                 </thead>
                 <tbody>
                   {rates.map((rate) => (
-                    <Fragment key={rate.id}>
-                      <tr
-                        className={`${!rate.active ? "is-inactive" : ""}${
-                          editingId === rate.id ? " is-editing" : ""
-                        }`}
-                      >
-                        <td>
-                          <code className="rate-code">{rate.code}</code>
-                        </td>
-                        <td>
-                          <div className="rate-name">{rate.name}</div>
-                          {rate.notes ? (
-                            <div className="rate-notes muted">{rate.notes}</div>
-                          ) : null}
-                        </td>
-                        <td>
-                          <span className="rate-category-pill">
-                            {formatCategory(rate.category)}
-                          </span>
-                        </td>
-                        <td>{rate.unit}</td>
-                        <td className="is-num money">{formatMoney(rate.cost_per_unit)}</td>
-                        <td className="is-num">
-                          {rate.waste_percent > 0 ? `${rate.waste_percent}%` : "—"}
-                        </td>
-                        <td>
-                          <span
-                            className={`status-pill ${
-                              rate.active ? "is-ready" : "is-warning"
-                            }`}
+                    <tr
+                      key={rate.id}
+                      className={!rate.active ? "is-inactive" : undefined}
+                    >
+                      <td>
+                        <code className="rate-code">{rate.code}</code>
+                      </td>
+                      <td>
+                        <div className="rate-name">{rate.name}</div>
+                        {rate.notes ? (
+                          <div className="rate-notes muted">{rate.notes}</div>
+                        ) : null}
+                      </td>
+                      <td>
+                        <span className="rate-category-pill">
+                          {formatCategory(rate.category)}
+                        </span>
+                      </td>
+                      <td>{rate.unit}</td>
+                      <td className="is-num money">{formatMoney(rate.cost_per_unit)}</td>
+                      <td className="is-num">
+                        {rate.waste_percent > 0 ? `${rate.waste_percent}%` : "—"}
+                      </td>
+                      <td>
+                        <span
+                          className={`status-pill ${
+                            rate.active ? "is-success" : "is-closed"
+                          }`}
+                        >
+                          {rate.active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="is-actions">
+                        <div className="rate-row-actions">
+                          <button
+                            className="btn btn-secondary btn-compact"
+                            type="button"
+                            onClick={() => setDrawer({ mode: "edit", rate })}
                           >
-                            {rate.active ? "Active" : "Inactive"}
-                          </span>
-                        </td>
-                        <td className="is-actions">
-                          <div className="rate-row-actions">
-                            <button
-                              className="btn btn-secondary btn-compact"
-                              type="button"
-                              onClick={() =>
-                                setEditingId((current) =>
-                                  current === rate.id ? null : rate.id,
-                                )
-                              }
-                            >
-                              {editingId === rate.id ? "Close" : "Edit"}
-                            </button>
-                            <button
-                              className="btn btn-secondary btn-compact"
-                              type="button"
-                              onClick={() => void toggleHistory(rate)}
-                            >
-                              {historyId === rate.id ? "Hide history" : "History"}
-                            </button>
-                            <button
-                              className="btn btn-secondary btn-compact"
-                              type="button"
-                              onClick={() => void toggleActive(rate)}
-                            >
-                              {rate.active ? "Deactivate" : "Activate"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {editingId === rate.id ? (
-                        <tr className="rate-edit-row">
-                          <td colSpan={8}>
-                            <form
-                              className="rate-edit-form stack"
-                              onSubmit={(event) => void onSaveRate(event, rate)}
-                            >
-                              <strong>Edit {rate.code}</strong>
-                              <div className="row">
-                                <div className="field">
-                                  <label htmlFor={`name-${rate.id}`}>Name</label>
-                                  <input
-                                    id={`name-${rate.id}`}
-                                    name="name"
-                                    defaultValue={rate.name}
-                                    required
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor={`category-${rate.id}`}>Category</label>
-                                  <input
-                                    id={`category-${rate.id}`}
-                                    name="category"
-                                    defaultValue={rate.category}
-                                    required
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor={`unit-${rate.id}`}>Unit</label>
-                                  <input
-                                    id={`unit-${rate.id}`}
-                                    name="unit"
-                                    defaultValue={rate.unit}
-                                  />
-                                </div>
-                              </div>
-                              <div className="row">
-                                <div className="field">
-                                  <label htmlFor={`cost-${rate.id}`}>Cost (£)</label>
-                                  <input
-                                    id={`cost-${rate.id}`}
-                                    name="cost_per_unit"
-                                    type="number"
-                                    min={0}
-                                    step="0.01"
-                                    defaultValue={rate.cost_per_unit}
-                                    required
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor={`waste-${rate.id}`}>Waste %</label>
-                                  <input
-                                    id={`waste-${rate.id}`}
-                                    name="waste_percent"
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    step="0.1"
-                                    defaultValue={rate.waste_percent}
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor={`notes-${rate.id}`}>Notes</label>
-                                  <input
-                                    id={`notes-${rate.id}`}
-                                    name="notes"
-                                    defaultValue={rate.notes}
-                                  />
-                                </div>
-                              </div>
-                              <div className="row">
-                                <div className="field">
-                                  <label htmlFor={`reason-${rate.id}`}>
-                                    Change reason (if cost changes)
-                                  </label>
-                                  <input
-                                    id={`reason-${rate.id}`}
-                                    name="change_reason"
-                                    placeholder="e.g. Supplier price increase Apr 2026"
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor={`effective-${rate.id}`}>
-                                    Effective date
-                                  </label>
-                                  <input
-                                    id={`effective-${rate.id}`}
-                                    name="effective_date"
-                                    type="date"
-                                    defaultValue={rate.effective_date || ""}
-                                  />
-                                </div>
-                              </div>
-                              <label className="check-line">
-                                <input
-                                  type="checkbox"
-                                  name="active"
-                                  defaultChecked={Boolean(rate.active)}
-                                />
-                                Active
-                              </label>
-                              <div className="step-actions">
-                                <button
-                                  className="btn btn-secondary"
-                                  type="button"
-                                  onClick={() => setEditingId(null)}
-                                >
-                                  Cancel
-                                </button>
-                                <button
-                                  className="btn btn-primary"
-                                  type="submit"
-                                  disabled={saving}
-                                >
-                                  Save changes
-                                </button>
-                              </div>
-                            </form>
-                          </td>
-                        </tr>
-                      ) : null}
-                      {historyId === rate.id ? (
-                        <tr className="rate-history-row">
-                          <td colSpan={8}>
-                            <div className="stack">
-                              <strong>Cost history — {rate.code}</strong>
-                              {historyLoading ? (
-                                <p className="muted">Loading history…</p>
-                              ) : historyRows.length === 0 ? (
-                                <p className="muted">
-                                  No cost versions recorded yet for this rate.
-                                </p>
-                              ) : (
-                                <div className="rate-table-wrap">
-                                  <table className="rate-table">
-                                    <thead>
-                                      <tr>
-                                        <th scope="col">When</th>
-                                        <th scope="col">Effective</th>
-                                        <th scope="col" className="is-num">
-                                          Previous
-                                        </th>
-                                        <th scope="col" className="is-num">
-                                          New
-                                        </th>
-                                        <th scope="col">Reason</th>
-                                        <th scope="col">By</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {historyRows.map((row) => (
-                                        <tr key={row.id}>
-                                          <td>
-                                            {row.created_at
-                                              ? row.created_at.slice(0, 19).replace("T", " ")
-                                              : "—"}
-                                          </td>
-                                          <td>{row.effective_date || "—"}</td>
-                                          <td className="is-num money">
-                                            {formatMoney(row.previous_cost)}
-                                          </td>
-                                          <td className="is-num money">
-                                            {formatMoney(row.new_cost)}
-                                          </td>
-                                          <td>{row.reason || "—"}</td>
-                                          <td>{row.changed_by_name || "—"}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-compact"
+                            type="button"
+                            onClick={() => void openHistory(rate)}
+                          >
+                            History
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-compact"
+                            type="button"
+                            onClick={() => requestToggleActive(rate)}
+                          >
+                            {rate.active ? "Deactivate" : "Activate"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
               {!rates.length ? (
-                <div className="rate-table-empty muted">
-                  {hasFilters
-                    ? "No rates match your search. Try clearing filters."
-                    : "No rates in the table yet."}
+                <div className="empty-state estimates-table-empty">
+                  <strong>
+                    {hasFilters ? "No rates match these filters" : "No rates yet"}
+                  </strong>
+                  <p>
+                    {hasFilters
+                      ? "Try clearing filters or broadening your search."
+                      : "Add the first rate to build the commercial library."}
+                  </p>
+                  <div className="step-actions" style={{ justifyContent: "center" }}>
+                    {hasFilters ? (
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        onClick={resetFilters}
+                      >
+                        Clear filters
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-primary"
+                        type="button"
+                        onClick={() => setDrawer({ mode: "add" })}
+                      >
+                        Add rate
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1013,7 +675,257 @@ export default function RatesPage() {
             ) : null}
           </div>
         </>
-      ) : null}
+
+      <SideDrawer
+        open={Boolean(drawer)}
+        title={
+          drawer?.mode === "add"
+            ? "Add rate"
+            : drawer?.mode === "edit"
+              ? `Edit ${drawer.rate.code}`
+              : drawer?.mode === "history"
+                ? `Cost history — ${drawer.rate.code}`
+                : ""
+        }
+        subtitle={
+          drawer?.mode === "edit"
+            ? drawer.rate.name
+            : drawer?.mode === "history"
+              ? drawer.rate.name
+              : "New rate for the library"
+        }
+        onClose={closeDrawer}
+        wide={drawer?.mode === "history"}
+      >
+        {drawer?.mode === "add" ? (
+          <form className="rate-drawer-form stack" onSubmit={onCreateRate}>
+            <div className="field">
+              <label htmlFor="drawer-code">Code</label>
+              <input id="drawer-code" name="code" required placeholder="MAT-EXAMPLE" />
+            </div>
+            <div className="field">
+              <label htmlFor="drawer-name">Name</label>
+              <input id="drawer-name" name="name" required />
+            </div>
+            <div className="field">
+              <label htmlFor="drawer-category">Category</label>
+              <input
+                id="drawer-category"
+                name="category"
+                list="rate-categories-drawer"
+                required
+                placeholder="materials"
+              />
+              <datalist id="rate-categories-drawer">
+                {categoryOptions.map((cat) => (
+                  <option key={cat} value={cat} />
+                ))}
+              </datalist>
+            </div>
+            <div className="row">
+              <div className="field">
+                <label htmlFor="drawer-unit">Unit</label>
+                <input id="drawer-unit" name="unit" defaultValue="each" />
+              </div>
+              <div className="field">
+                <label htmlFor="drawer-cost">Cost per unit (£)</label>
+                <input
+                  id="drawer-cost"
+                  name="cost_per_unit"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  required
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="drawer-waste">Waste %</label>
+              <input
+                id="drawer-waste"
+                name="waste_percent"
+                type="number"
+                min={0}
+                max={100}
+                step="0.1"
+                defaultValue={0}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="drawer-notes">Notes</label>
+              <input id="drawer-notes" name="notes" />
+            </div>
+            <div className="side-drawer-actions">
+              <button className="btn btn-secondary" type="button" onClick={closeDrawer}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                Add rate
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {drawer?.mode === "edit" ? (
+          <form
+            key={drawer.rate.id}
+            className="rate-drawer-form stack"
+            onSubmit={(event) => void onSaveRate(event, drawer.rate)}
+          >
+            <div className="field">
+              <label htmlFor="edit-name">Name</label>
+              <input
+                id="edit-name"
+                name="name"
+                defaultValue={drawer.rate.name}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-category">Category</label>
+              <input
+                id="edit-category"
+                name="category"
+                defaultValue={drawer.rate.category}
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-unit">Unit</label>
+              <input id="edit-unit" name="unit" defaultValue={drawer.rate.unit} />
+            </div>
+            <div className="row">
+              <div className="field">
+                <label htmlFor="edit-cost">Cost (£)</label>
+                <input
+                  id="edit-cost"
+                  name="cost_per_unit"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  defaultValue={drawer.rate.cost_per_unit}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="edit-waste">Waste %</label>
+                <input
+                  id="edit-waste"
+                  name="waste_percent"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  defaultValue={drawer.rate.waste_percent}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="edit-notes">Notes</label>
+              <input id="edit-notes" name="notes" defaultValue={drawer.rate.notes} />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-reason">Change reason (if cost changes)</label>
+              <input
+                id="edit-reason"
+                name="change_reason"
+                placeholder="e.g. Supplier price increase Apr 2026"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="edit-effective">Effective date</label>
+              <input
+                id="edit-effective"
+                name="effective_date"
+                type="date"
+                defaultValue={drawer.rate.effective_date || ""}
+              />
+            </div>
+            <label className="check-line">
+              <input
+                type="checkbox"
+                name="active"
+                defaultChecked={Boolean(drawer.rate.active)}
+              />
+              Active
+            </label>
+            <div className="side-drawer-actions">
+              <button className="btn btn-secondary" type="button" onClick={closeDrawer}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                Save changes
+              </button>
+            </div>
+          </form>
+        ) : null}
+
+        {drawer?.mode === "history" ? (
+          <div className="stack">
+            {historyLoading ? (
+              <p className="muted">Loading history…</p>
+            ) : historyRows.length === 0 ? (
+              <p className="muted">No cost versions recorded yet for this rate.</p>
+            ) : (
+              <div className="rate-table-wrap">
+                <table className="rate-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">When</th>
+                      <th scope="col">Effective</th>
+                      <th scope="col" className="is-num">
+                        Previous
+                      </th>
+                      <th scope="col" className="is-num">
+                        New
+                      </th>
+                      <th scope="col">Reason</th>
+                      <th scope="col">By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{formatUkDateTime(row.created_at)}</td>
+                        <td>{formatUkDate(row.effective_date)}</td>
+                        <td className="is-num money">{formatMoney(row.previous_cost)}</td>
+                        <td className="is-num money">{formatMoney(row.new_cost)}</td>
+                        <td>{row.reason || "—"}</td>
+                        <td>{row.changed_by_name || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="side-drawer-actions">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => setDrawer({ mode: "edit", rate: drawer.rate })}
+              >
+                Edit rate
+              </button>
+              <button className="btn btn-primary" type="button" onClick={closeDrawer}>
+                Close history
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </SideDrawer>
+
+      <ConfirmDialog
+        open={Boolean(pendingRateConfirm)}
+        title={pendingRateConfirm?.title || ""}
+        message={pendingRateConfirm?.message || ""}
+        confirmLabel={pendingRateConfirm?.confirmLabel || "Confirm"}
+        tone={pendingRateConfirm?.tone || "primary"}
+        busy={confirmBusy}
+        onCancel={() => {
+          if (!confirmBusy) setPendingRateConfirm(null);
+        }}
+        onConfirm={() => void runPendingRateConfirm()}
+      />
     </section>
   );
 }

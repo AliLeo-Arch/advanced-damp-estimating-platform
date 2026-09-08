@@ -2,31 +2,35 @@
 
 Configurable estimating and quoting platform for specialist contractors: CRM → survey → estimate → margin-controlled sell price → branded quotation PDF → job actuals.
 
-**Version:** 1.0.0-local-prod
+**App version:** `1.0.0-local-prod`  
+**Docs pack:** [`docs/VERSION.md`](./docs/VERSION.md) (`1.0.0-trade-estimating`)  
+**Branch:** `feature/generic-branding`
 
 ## Documentation
 
+Full index: [`docs/README.md`](./docs/README.md)
+
 | Document | Purpose |
 |---|---|
-| [`Generic_Trade_Estimating_Quoting_Platform_Product_Definition.md`](./Generic_Trade_Estimating_Quoting_Platform_Product_Definition.md) | Generic product definition & refactoring blueprint |
-| [`Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md`](./Advanced_Damp_Production_Level_Local_Estimating_Platform_Project_Overview.md) | Original client production blueprint (historical) |
-| [`Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md`](./Advanced_Damp_Job_Estimating_Quoting_POC_Project_Overview_v2.md) | Original POC overview (historical) |
-| [`docs/CLIENT_HANDOFF.md`](./docs/CLIENT_HANDOFF.md) | **Handoff pack** (start here) |
-| [`docs/VERCEL_DEPLOYMENT.md`](./docs/VERCEL_DEPLOYMENT.md) | Deploy frontend + API on Vercel |
-| [`docs/CHANGELOG.md`](./docs/CHANGELOG.md) | Recent features (search, exports, rate table, demos) |
-| [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md) | Estimate/rate search & export endpoints |
-| [`docs/LOCAL_PRODUCTION_ASSUMPTIONS.md`](./docs/LOCAL_PRODUCTION_ASSUMPTIONS.md) | Assumed defaults, lifecycle, permissions |
-| [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md) | Day-to-day user guide |
-| [`docs/ADMIN_GUIDE.md`](./docs/ADMIN_GUIDE.md) | Backups, rates, security |
-| [`docs/RELEASE_CHECKLIST.md`](./docs/RELEASE_CHECKLIST.md) | Go-live checklist |
-| [`docs/IMPLEMENTATION_STATUS.md`](./docs/IMPLEMENTATION_STATUS.md) | Phase A–G status and go-live gate |
-| [`docs/ACCEPTANCE_TEST_SCENARIOS.md`](./docs/ACCEPTANCE_TEST_SCENARIOS.md) | UAT scenarios A–J (+ K–M) |
-| [`docs/HISTORICAL_JOB_VALIDATION.md`](./docs/HISTORICAL_JOB_VALIDATION.md) | Real job sign-off worksheet |
-| [`docs/DELIVERY_NOTE.md`](./docs/DELIVERY_NOTE.md) | Short delivery summary |
-| [`docs/SCRIPTS_REFERENCE.md`](./docs/SCRIPTS_REFERENCE.md) | PowerShell scripts |
-| [`docs/RATE_IMPORT.md`](./docs/RATE_IMPORT.md) | Bulk rate CSV import & export |
-| [`docs/MOBILE_UI_UX_PRINCIPLES.md`](./docs/MOBILE_UI_UX_PRINCIPLES.md) | Mobile/tablet UX |
-| [`docs/UI_UX_DESIGN_SYSTEM.md`](./docs/UI_UX_DESIGN_SYSTEM.md) | Brand and UI rules |
+| [`docs/ops/CLIENT_HANDOFF.md`](./docs/ops/CLIENT_HANDOFF.md) | **Handoff pack** (start here) |
+| [`docs/product/PRODUCT_DEFINITION.md`](./docs/product/PRODUCT_DEFINITION.md) | Generic product definition |
+| [`docs/product/UI_UX_ENHANCEMENT_SPECIFICATION.md`](./docs/product/UI_UX_ENHANCEMENT_SPECIFICATION.md) | UI/UX enhancement specification |
+| [`docs/ops/CHANGELOG.md`](./docs/ops/CHANGELOG.md) | Feature history |
+| [`docs/guides/USER_GUIDE.md`](./docs/guides/USER_GUIDE.md) | Day-to-day user guide |
+| [`docs/guides/ADMIN_GUIDE.md`](./docs/guides/ADMIN_GUIDE.md) | Backups, rates, security |
+| [`docs/ops/RELEASE_CHECKLIST.md`](./docs/ops/RELEASE_CHECKLIST.md) | Go-live checklist |
+| [`docs/ops/SECURITY.md`](./docs/ops/SECURITY.md) | Security notes |
+| [`docs/ops/SCRIPTS_REFERENCE.md`](./docs/ops/SCRIPTS_REFERENCE.md) | PowerShell scripts |
+
+### Branch-separated packs (exact versions)
+
+| Pack | Version | Location |
+|---|---|---|
+| Trade Estimating docs (this branch) | `1.0.0-trade-estimating` | [`docs/`](./docs/) |
+| Trade Estimating demos | `1.0.0` | [`docs/demos/trade-estimating/`](./docs/demos/trade-estimating/) |
+| Advanced Damp client archive | `v1.0.0` | [`docs/clients/advanced-damp/`](./docs/clients/advanced-damp/) |
+
+`main` remains the Advanced Damp client delivery line. This branch keeps the Advanced Damp pack frozen under `docs/clients/advanced-damp/v1.0.0/` for reference only.
 
 ## Stack
 
@@ -42,7 +46,7 @@ Configurable estimating and quoting platform for specialist contractors: CRM →
 .\scripts\start-local.ps1
 ```
 
-Opens backend (8000) and frontend (5173) in separate terminals. See `docs/CLIENT_HANDOFF.md` for first-time setup.
+Opens backend (8000) and frontend (5173) in separate terminals. See `docs/ops/CLIENT_HANDOFF.md` for first-time setup.
 
 **Production mode (single port — recommended on office PC):**
 
@@ -108,6 +112,7 @@ Change passwords and JWT secret before live use.
 ```powershell
 .\scripts\backup.ps1
 .\scripts\restore.ps1 trade_estimating-YYYYMMDD-HHMMSS.db
+.\scripts\register-daily-backup.ps1
 ```
 
 Or use **Admin** in the app (owner/admin). Restart the backend after restore.
@@ -120,4 +125,4 @@ Or use **Admin** in the app (owner/admin). Restart the backend after restore.
 
 ## Notes
 
-Placeholder commercial rates are used until the deploying contractor supplies live price lists. See `docs/RELEASE_CHECKLIST.md` before go-live.
+Placeholder commercial rates are used until the deploying contractor supplies live price lists. See `docs/ops/RELEASE_CHECKLIST.md` before go-live.

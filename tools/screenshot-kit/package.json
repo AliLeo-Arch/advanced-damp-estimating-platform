@@ -1,0 +1,14 @@
+{
+  "name": "trade-estimating-screenshot-kit",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Standalone Playwright utility to capture Trade Estimating & Quoting product screenshots. Not part of the application runtime.",
+  "type": "module",
+  "scripts": {
+    "capture": "node src/capture.mjs",
+    "install:browsers": "node ./node_modules/playwright/cli.js install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.55.0"
+  }
+}

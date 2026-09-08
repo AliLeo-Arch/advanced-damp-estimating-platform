@@ -175,10 +175,14 @@ def render_estimates_list_csv(estimates: Iterable[Estimate]) -> bytes:
         margin_var = ""
         if actuals is not None:
             comparison = build_comparison(row, actuals)
-            actual_cost = f"{comparison.total_cost.actual:.2f}"
-            cost_variance = f"{comparison.total_cost.variance:.2f}"
-            actual_margin = f"{comparison.actual_margin_percent:.2f}"
-            margin_var = f"{comparison.margin_percent_variance:.2f}"
+            if comparison.total_cost.actual is not None:
+                actual_cost = f"{comparison.total_cost.actual:.2f}"
+            if comparison.total_cost.variance is not None:
+                cost_variance = f"{comparison.total_cost.variance:.2f}"
+            if comparison.actual_margin_percent is not None:
+                actual_margin = f"{comparison.actual_margin_percent:.2f}"
+            if comparison.margin_percent_variance is not None:
+                margin_var = f"{comparison.margin_percent_variance:.2f}"
         writer.writerow(
             [
                 row.reference,

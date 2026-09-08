@@ -11,6 +11,7 @@ class HealthResponse(BaseModel):
     version: str = ""
     environment: str = ""
     database_ok: bool = False
+    demo_helpers: bool = False
 
 
 class RateItemRead(BaseModel):
@@ -213,26 +214,29 @@ class EstimateApproveRequest(BaseModel):
 
 
 class ActualsUpdate(BaseModel):
-    materials_actual: float = Field(default=0.0, ge=0)
-    labour_actual: float = Field(default=0.0, ge=0)
-    waste_actual: float = Field(default=0.0, ge=0)
-    travel_actual: float = Field(default=0.0, ge=0)
-    prelims_actual: float = Field(default=0.0, ge=0)
-    other_actual: float = Field(default=0.0, ge=0)
+    materials_actual: float | None = Field(default=None, ge=0)
+    labour_actual: float | None = Field(default=None, ge=0)
+    waste_actual: float | None = Field(default=None, ge=0)
+    travel_actual: float | None = Field(default=None, ge=0)
+    prelims_actual: float | None = Field(default=None, ge=0)
+    other_actual: float | None = Field(default=None, ge=0)
     revenue_actual: float | None = Field(default=None, ge=0)
     notes: str = ""
 
 
 class ActualsRead(BaseModel):
     estimate_id: int
-    materials_actual: float
-    labour_actual: float
-    waste_actual: float
-    travel_actual: float
-    prelims_actual: float
-    other_actual: float
+    materials_actual: float | None
+    labour_actual: float | None
+    waste_actual: float | None
+    travel_actual: float | None
+    prelims_actual: float | None
+    other_actual: float | None
     revenue_actual: float | None
     notes: str
+    status: str = "not_started"
+    categories_entered: int = 0
+    categories_total: int = 6
     comparison: dict[str, Any]
 
 

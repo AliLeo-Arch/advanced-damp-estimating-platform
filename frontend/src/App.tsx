@@ -10,12 +10,16 @@ import {
 import { AuthUser, clearSession, fetchSession, getStoredUser } from "./auth";
 import { CompanyProfile, getCompanyProfile } from "./api";
 import { LoadingState } from "./components/Loading";
+import UserMenu from "./components/UserMenu";
 import CustomersPage from "./pages/CustomersPage";
+import CustomerDetailPage from "./pages/CustomerDetailPage";
 import DashboardPage from "./pages/DashboardPage";
 import EstimateEditorPage from "./pages/EstimateEditorPage";
 import LoginPage from "./pages/LoginPage";
 import AdminPage from "./pages/AdminPage";
 import RatesPage from "./pages/RatesPage";
+import ReportsPage from "./pages/ReportsPage";
+import SettingsPage from "./pages/SettingsPage";
 
 const FALLBACK_COMPANY: CompanyProfile = {
   name: "Northbridge Property Services Ltd",
@@ -49,12 +53,12 @@ function GuestOnly({
   return children;
 }
 
-function canManageCommercial(user: AuthUser | null) {
-  if (!user) return false;
-  return (
-    user.permissions.includes("manage_rates") ||
-    user.permissions.includes("manage_settings")
-  );
+function canManageRates(user: AuthUser | null) {
+  return Boolean(user?.permissions?.includes("manage_rates"));
+}
+
+function canManageSettings(user: AuthUser | null) {
+  return Boolean(user?.permissions?.includes("manage_settings"));
 }
 
 function canAdmin(user: AuthUser | null) {
@@ -125,7 +129,14 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell${location.pathname === "/login" ? " is-login" : ""}`}>
+    <div
+      className={`app-shell${location.pathname === "/login" ? " is-login" : ""}${
+        menuOpen ? " is-menu-open" : ""
+      }`}
+    >
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <header className="app-header">
         <Link to="/" className="brand" aria-label="Trade Estimating & Quoting home">
           <img
@@ -144,14 +155,13 @@ export default function App() {
             <>
               <Link to="/">Estimates</Link>
               <Link to="/customers">Customers</Link>
-              {canManageCommercial(user) ? <Link to="/rates">Rates</Link> : null}
+              <Link to="/reports">Reports</Link>
+              {canManageRates(user) ? <Link to="/rates">Rates</Link> : null}
+              {canManageSettings(user) ? (
+                <Link to="/settings">Settings</Link>
+              ) : null}
               {canAdmin(user) ? <Link to="/admin">Admin</Link> : null}
-              <span className="nav-user">
-                {user.full_name} · {user.role}
-              </span>
-              <button className="btn btn-secondary" type="button" onClick={logout}>
-                Sign out
-              </button>
+              <UserMenu user={user} onSignOut={logout} />
               <Link to="/estimates/new" className="nav-cta">
                 New estimate
               </Link>
@@ -199,9 +209,17 @@ export default function App() {
                 <Link to="/customers" onClick={() => setMenuOpen(false)}>
                   Customers
                 </Link>
-                {canManageCommercial(user) ? (
+                <Link to="/reports" onClick={() => setMenuOpen(false)}>
+                  Reports
+                </Link>
+                {canManageRates(user) ? (
                   <Link to="/rates" onClick={() => setMenuOpen(false)}>
                     Rates
+                  </Link>
+                ) : null}
+                {canManageSettings(user) ? (
+                  <Link to="/settings" onClick={() => setMenuOpen(false)}>
+                    Settings
                   </Link>
                 ) : null}
                 {canAdmin(user) ? (
@@ -233,7 +251,7 @@ export default function App() {
         </>
       ) : null}
 
-      <main className="app-main">
+      <main id="main-content" className="app-main" tabIndex={-1}>
         <Routes>
           <Route
             path="/login"
@@ -260,10 +278,34 @@ export default function App() {
             }
           />
           <Route
+            path="/customers/:customerId"
+            element={
+              <Protected user={user}>
+                <CustomerDetailPage />
+              </Protected>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <Protected user={user}>
+                <ReportsPage />
+              </Protected>
+            }
+          />
+          <Route
             path="/rates"
             element={
               <Protected user={user}>
                 <RatesPage />
+              </Protected>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <Protected user={user}>
+                <SettingsPage />
               </Protected>
             }
           />

@@ -1,0 +1,5 @@
+node_modules/
+.playwright/
+output/
+*.log
+.env

@@ -33,7 +33,7 @@ Brand source: local synthetic demo assets under `frontend/public/brand/` (no cli
 
 ## Mobile (phone ≤640px)
 
-Follow `docs/MOBILE_UI_UX_PRINCIPLES.md`:
+Follow `docs/guides/MOBILE_UI_UX_PRINCIPLES.md`:
 - Header = logo + hamburger only; drawer for nav / New estimate / Sign out.
 - Single-column forms; no horizontal page scroll.
 - Inputs ≥16px; tap targets ≥44px.

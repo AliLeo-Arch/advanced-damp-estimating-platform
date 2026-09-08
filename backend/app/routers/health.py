@@ -30,6 +30,7 @@ def health(db: Session = Depends(get_db)) -> HealthResponse:
         version=settings.app_version,
         environment=settings.app_env,
         database_ok=db_ok,
+        demo_helpers=settings.demo_helpers_enabled,
     )
 
 

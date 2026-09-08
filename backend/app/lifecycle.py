@@ -8,8 +8,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import Estimate, EstimateItem, EstimateStatus, User
 from app.estimate_service import get_settings
+from app.models import Estimate, EstimateItem, EstimateStatus, User
+from app.pricing_engine import round_money
 
 
 # Assumed production transitions (confirm with deploying contractor)
@@ -118,6 +119,23 @@ def assert_can_issue_quotation(estimate: Estimate, db: Session) -> None:
                 status_code=400,
                 detail="Price the estimate before generating a quotation.",
             )
+
+    if not estimate.items:
+        raise HTTPException(
+            status_code=400,
+            detail="Add and price work items before generating a quotation.",
+        )
+
+    line_sum = round_money(sum(float(item.line_sell or 0) for item in estimate.items))
+    sell = round_money(float(estimate.sell_price or 0))
+    if abs(line_sum - sell) >= 0.005:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Displayed line amounts (£{line_sum:,.2f}) do not match the "
+                f"quotation subtotal (£{sell:,.2f}). Recalculate pricing before issuing."
+            ),
+        )
 
     if estimate.margin_percent + 0.01 < min_margin:
         raise HTTPException(

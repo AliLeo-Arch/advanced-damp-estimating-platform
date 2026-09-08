@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 
 from app.audit import write_audit
 from app.auth import require_permission
-from app.backup import backup_file_path, create_backup, list_backups, restore_backup
+from app.backup import (
+    DEFAULT_KEEP_BACKUPS,
+    backup_file_path,
+    create_backup,
+    list_backups,
+    restore_backup,
+)
 from app.config import settings
 from app.database import get_db
 from app.models import User
@@ -94,4 +100,6 @@ def system_info(
         "version": settings.app_version,
         "database_ok": db_ok,
         "backup_count": len(list_backups()),
+        "backup_retention_keep": DEFAULT_KEEP_BACKUPS,
+        "backup_recommended_cadence": "daily",
     }

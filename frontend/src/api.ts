@@ -168,7 +168,7 @@ export type Quotation = {
   revision_no?: number;
 };
 
-export type WorkType = { code: string; label: string };
+export type WorkType = { code: string; label: string; category?: string };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
@@ -239,6 +239,10 @@ export type SurveyDetail = Survey & {
 
 export function listCustomers() {
   return request<Customer[]>("/api/customers");
+}
+
+export function getCustomer(customerId: number) {
+  return request<Customer>(`/api/customers/${customerId}`);
 }
 
 export function createCustomer(payload: {
@@ -429,20 +433,26 @@ export function reviseEstimate(id: number) {
 export type ActualsComparisonRow = {
   label: string;
   estimated: number;
-  actual: number;
-  variance: number;
+  actual: number | null;
+  variance: number | null;
+  entered: boolean;
 };
+
+export type ActualsEntryStatus = "not_started" | "partial" | "complete";
 
 export type JobActuals = {
   estimate_id: number;
-  materials_actual: number;
-  labour_actual: number;
-  waste_actual: number;
-  travel_actual: number;
-  prelims_actual: number;
-  other_actual: number;
+  materials_actual: number | null;
+  labour_actual: number | null;
+  waste_actual: number | null;
+  travel_actual: number | null;
+  prelims_actual: number | null;
+  other_actual: number | null;
   revenue_actual: number | null;
   notes: string;
+  status: ActualsEntryStatus;
+  categories_entered: number;
+  categories_total: number;
   comparison: {
     materials: ActualsComparisonRow;
     labour: ActualsComparisonRow;
@@ -455,8 +465,11 @@ export type JobActuals = {
     margin_value: ActualsComparisonRow;
     margin_percent: ActualsComparisonRow;
     estimated_margin_percent: number;
-    actual_margin_percent: number;
-    margin_percent_variance: number;
+    actual_margin_percent: number | null;
+    margin_percent_variance: number | null;
+    status: ActualsEntryStatus;
+    categories_entered: number;
+    categories_total: number;
   };
 };
 
@@ -495,15 +508,35 @@ export function getActualsSummary(limit = 50) {
   );
 }
 
+export type OpsSummary = {
+  total: number;
+  by_status: Record<string, number>;
+  draft: number;
+  priced: number;
+  review_required: number;
+  ready_to_quote: number;
+  quoted: number;
+  accepted: number;
+  active_pipeline: number;
+};
+
+export function getOpsSummary() {
+  return request<OpsSummary>("/api/estimates/ops-summary");
+}
+
+export function listEstimateFamily(estimateId: number) {
+  return request<Estimate[]>(`/api/estimates/${estimateId}/family`);
+}
+
 export function updateJobActuals(
   estimateId: number,
   payload: {
-    materials_actual?: number;
-    labour_actual?: number;
-    waste_actual?: number;
-    travel_actual?: number;
-    prelims_actual?: number;
-    other_actual?: number;
+    materials_actual?: number | null;
+    labour_actual?: number | null;
+    waste_actual?: number | null;
+    travel_actual?: number | null;
+    prelims_actual?: number | null;
+    other_actual?: number | null;
     revenue_actual?: number | null;
     notes?: string;
   },
@@ -702,6 +735,7 @@ export type HealthResponse = {
   version?: string;
   environment?: string;
   database_ok?: boolean;
+  demo_helpers?: boolean;
 };
 
 export type BackupRow = {
@@ -716,6 +750,8 @@ export type SystemInfo = {
   version: string;
   database_ok: boolean;
   backup_count: number;
+  backup_retention_keep?: number;
+  backup_recommended_cadence?: string;
 };
 
 export function getHealth() {

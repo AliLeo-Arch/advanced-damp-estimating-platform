@@ -1,33 +1,50 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import ConfirmDialog from "../components/ConfirmDialog";
+import ActionMenu, { ActionMenuItem } from "../components/ActionMenu";
 import { EditorSkeleton } from "../components/Loading";
+import StatusPill from "../components/StatusPill";
 import {
   approveEstimate,
+  createCustomer,
   createEstimate,
+  createSite,
+  createSurvey,
+  Customer,
   Estimate,
   EstimatePayload,
   formatMoney,
+  getCustomer,
   getEstimate,
   getJobActuals,
   getPricingSettings,
   getQuotation,
   getSurvey,
   JobActuals,
+  listCustomers,
   listRates,
+  listSites,
+  listSurveys,
   listWorkTypes,
   PricingSettings,
   Quotation,
   RateItem,
   reviseEstimate,
+  Site,
+  Survey,
   transitionEstimate,
   updateEstimate,
   updateJobActuals,
+  listEstimateFamily,
   quotationPdfUrl,
   estimateCsvUrl,
   estimateXlsxUrl,
   WorkType,
 } from "../api";
 import { getStoredUser } from "../auth";
+import { formatEstimateStatus, isEstimateLocked } from "../estimateStatus";
+import { formatUkDate, formatUkDateTime, formatUkTime } from "../locale";
+import { getFieldModeEnabled } from "../components/UserMenu";
 
 type Step =
   | "customer"
@@ -61,13 +78,9 @@ const QUOTATION_STATUSES = new Set([
   "approved",
 ]);
 
-function formatStatusLabel(status: string) {
-  return status.replaceAll("_", " ");
-}
-
 /** Cost overruns are bad; revenue/margin increases are good. */
-function varianceTone(label: string, variance: number) {
-  if (variance === 0) return "";
+function varianceTone(label: string, variance: number | null) {
+  if (variance == null || variance === 0) return "";
   const higherIsBetter =
     label.startsWith("Revenue") || label.startsWith("Margin");
   if (higherIsBetter) {
@@ -76,24 +89,30 @@ function varianceTone(label: string, variance: number) {
   return variance > 0 ? "is-danger" : "is-success";
 }
 
-function statusTone(status: string) {
+function moneyOrBlank(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function actualFieldValue(value: number | null | undefined): string {
+  return value == null ? "" : String(value);
+}
+
+function formatOptionalMoney(value: number | null | undefined) {
+  if (value == null) return "—";
+  return formatMoney(value);
+}
+
+function actualsStatusLabel(status: string) {
   switch (status) {
-    case "ready_to_quote":
-      return "is-ready";
-    case "quoted":
-    case "accepted":
-      return "is-success";
-    case "review_required":
-    case "expired":
-      return "is-warning";
-    case "declined":
-      return "is-warning";
-    case "closed":
-      return "is-priced";
-    case "priced":
-      return "is-priced";
+    case "complete":
+      return "Complete";
+    case "partial":
+      return "Partial";
     default:
-      return "";
+      return "Not started";
   }
 }
 
@@ -140,10 +159,65 @@ function emptyCustomer() {
   };
 }
 
+function formatSiteAddress(site: Site) {
+  return [site.address_line1, site.address_line2, site.town]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function customerLabel(row: Customer) {
+  if (row.company_name.trim()) {
+    return `${row.name} (${row.company_name})`;
+  }
+  return row.name;
+}
+
+function serializeEstimateDraft(input: {
+  customer: ReturnType<typeof emptyCustomer>;
+  linkIds: { customer_id: number | null; site_id: number | null; survey_id: number | null };
+  items: DraftItem[];
+  travelBand: string;
+  wasteCode: string;
+  prelimCodes: string[];
+  overrideSell: string;
+  overrideReason: string;
+}) {
+  return JSON.stringify({
+    customer: input.customer,
+    linkIds: input.linkIds,
+    items: input.items.map((item) => ({
+      work_type: item.work_type,
+      measurements: item.measurements,
+    })),
+    travelBand: input.travelBand,
+    wasteCode: input.wasteCode,
+    prelimCodes: [...input.prelimCodes].sort(),
+    overrideSell: input.overrideSell,
+    overrideReason: input.overrideReason,
+  });
+}
+
+type BreakdownLine = {
+  work_type?: string;
+  label?: string;
+  line_cost?: number;
+  allocated_job_cost?: number;
+  fully_loaded_cost?: number;
+  line_sell?: number;
+  target_margin_percent?: number;
+};
+
+function getBreakdownLines(estimate: Estimate): BreakdownLine[] {
+  const lines = estimate.breakdown?.lines;
+  return Array.isArray(lines) ? (lines as BreakdownLine[]) : [];
+}
+
 export default function EstimateEditorPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const surveyIdParam = searchParams.get("survey_id");
+  const customerIdParam = searchParams.get("customer_id");
   const isEdit = Boolean(id);
   const estimateId = id ? Number(id) : null;
   const navigate = useNavigate();
@@ -156,6 +230,25 @@ export default function EstimateEditorPage() {
     survey_id: number | null;
   }>({ customer_id: null, site_id: null, survey_id: null });
   const [linkedSurveyRef, setLinkedSurveyRef] = useState<string | null>(null);
+  const [crmCustomers, setCrmCustomers] = useState<Customer[]>([]);
+  const [crmSites, setCrmSites] = useState<Site[]>([]);
+  const [crmSurveys, setCrmSurveys] = useState<Survey[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [showAddSite, setShowAddSite] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: "",
+    customer_type: "homeowner",
+    telephone: "",
+    email: "",
+  });
+  const [newSiteForm, setNewSiteForm] = useState({
+    label: "Main property",
+    address_line1: "",
+    town: "",
+    postcode: "",
+  });
+  const [crmBusy, setCrmBusy] = useState(false);
   const [items, setItems] = useState<DraftItem[]>([]);
   const [travelBand, setTravelBand] = useState("TRV-LOCAL");
   const [wasteCode, setWasteCode] = useState("WS-ALLOW-SMALL");
@@ -163,6 +256,9 @@ export default function EstimateEditorPage() {
   const [overrideSell, setOverrideSell] = useState<string>("");
   const [overrideReason, setOverrideReason] = useState("");
   const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [estimateFamily, setEstimateFamily] = useState<Estimate[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [fieldMode, setFieldMode] = useState(() => getFieldModeEnabled());
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [jobActuals, setJobActuals] = useState<JobActuals | null>(null);
   const [actualsForm, setActualsForm] = useState({
@@ -183,16 +279,145 @@ export default function EstimateEditorPage() {
     acceptance_notes: "",
   });
   const [workTypes, setWorkTypes] = useState<WorkType[]>([]);
+  const [workTypeSearch, setWorkTypeSearch] = useState("");
   const [rates, setRates] = useState<RateItem[]>([]);
   const [settings, setSettings] = useState<PricingSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedDraftKey, setSavedDraftKey] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [baselineEpoch, setBaselineEpoch] = useState(0);
+  const [pendingLeaveHref, setPendingLeaveHref] = useState<string | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    tone?: "primary" | "danger";
+    run: () => Promise<void>;
+  } | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const selectedTypes = useMemo(
     () => new Set(items.map((item) => item.work_type)),
     [items],
   );
+
+  const workTypeGroups = useMemo(() => {
+    const term = workTypeSearch.trim().toLowerCase();
+    const filtered = workTypes.filter((type) => {
+      if (!term) return true;
+      const haystack = `${type.label} ${type.code} ${type.category || ""}`.toLowerCase();
+      return haystack.includes(term);
+    });
+    const groups = new Map<string, WorkType[]>();
+    for (const type of filtered) {
+      const category = type.category || "General";
+      const bucket = groups.get(category) || [];
+      bucket.push(type);
+      groups.set(category, bucket);
+    }
+    return Array.from(groups.entries());
+  }, [workTypes, workTypeSearch]);
+
+  const filteredCustomers = useMemo(() => {
+    const term = customerSearch.trim().toLowerCase();
+    if (!term) return crmCustomers;
+    return crmCustomers.filter((row) => {
+      const haystack = `${row.name} ${row.company_name} ${row.email} ${row.telephone}`.toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [crmCustomers, customerSearch]);
+
+  const selectedCrmCustomer = useMemo(
+    () => crmCustomers.find((row) => row.id === linkIds.customer_id) ?? null,
+    [crmCustomers, linkIds.customer_id],
+  );
+  const selectedCrmSite = useMemo(
+    () => crmSites.find((row) => row.id === linkIds.site_id) ?? null,
+    [crmSites, linkIds.site_id],
+  );
+
+  const draftKey = useMemo(
+    () =>
+      serializeEstimateDraft({
+        customer,
+        linkIds,
+        items,
+        travelBand,
+        wasteCode,
+        prelimCodes,
+        overrideSell,
+        overrideReason,
+      }),
+    [
+      customer,
+      linkIds,
+      items,
+      travelBand,
+      wasteCode,
+      prelimCodes,
+      overrideSell,
+      overrideReason,
+    ],
+  );
+
+  useEffect(() => {
+    if (loading) return;
+    setSavedDraftKey(draftKey);
+    if (baselineEpoch > 0 || estimateId) {
+      setLastSavedAt(new Date());
+    }
+    // Capture baseline after load or successful save; ignore draftKey here on purpose.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, baselineEpoch]);
+
+  useEffect(() => {
+    setSavedDraftKey(null);
+    setLastSavedAt(null);
+    setBaselineEpoch(0);
+    setPendingLeaveHref(null);
+  }, [estimateId]);
+
+  const isDirty =
+    !loading &&
+    savedDraftKey != null &&
+    draftKey !== savedDraftKey &&
+    !isEstimateLocked(estimate?.status);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
+  useEffect(() => {
+    if (!isDirty || saving) return;
+    function onDocumentClick(event: MouseEvent) {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]");
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target && anchor.target !== "_self") return;
+      if (anchor.hasAttribute("download")) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      const current = `${window.location.pathname}${window.location.search}`;
+      const next = `${url.pathname}${url.search}`;
+      if (next === current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingLeaveHref(next);
+    }
+    document.addEventListener("click", onDocumentClick, true);
+    return () => document.removeEventListener("click", onDocumentClick, true);
+  }, [isDirty, saving]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,15 +426,17 @@ export default function EstimateEditorPage() {
       setLoading(true);
       setError(null);
       try {
-        const [types, rateRows, pricing] = await Promise.all([
+        const [types, rateRows, pricing, customers] = await Promise.all([
           listWorkTypes(),
           listRates(),
           getPricingSettings(),
+          listCustomers(),
         ]);
         if (cancelled) return;
         setWorkTypes(types);
         setRates(rateRows);
         setSettings(pricing);
+        setCrmCustomers(customers);
 
         if (isEdit && estimateId && !Number.isNaN(estimateId)) {
           const row = await getEstimate(estimateId);
@@ -279,6 +506,53 @@ export default function EstimateEditorPage() {
                 .join("\n\n"),
             });
           }
+        } else if (customerIdParam) {
+          const customerId = Number(customerIdParam);
+          if (!Number.isNaN(customerId)) {
+            const row =
+              customers.find((item) => item.id === customerId) ??
+              (await getCustomer(customerId).catch(() => null));
+            if (cancelled) return;
+            if (row) {
+              setLinkIds({
+                customer_id: row.id,
+                site_id: null,
+                survey_id: null,
+              });
+              setCustomer({
+                customer_name: row.name,
+                company_name: row.company_name || "",
+                email: row.email || "",
+                telephone: row.telephone || "",
+                site_address: "",
+                postcode: "",
+                surveyor: "",
+                survey_date: "",
+                notes: row.notes || "",
+              });
+              const sites = await listSites(row.id);
+              if (cancelled) return;
+              setCrmSites(sites);
+              if (sites.length === 1) {
+                setLinkIds({
+                  customer_id: row.id,
+                  site_id: sites[0].id,
+                  survey_id: null,
+                });
+                setCustomer((current) => ({
+                  ...current,
+                  site_address: [
+                    sites[0].address_line1,
+                    sites[0].address_line2,
+                    sites[0].town,
+                  ]
+                    .filter(Boolean)
+                    .join(", "),
+                  postcode: sites[0].postcode || "",
+                }));
+              }
+            }
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -293,7 +567,80 @@ export default function EstimateEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [estimateId, isEdit, surveyIdParam]);
+  }, [estimateId, isEdit, surveyIdParam, customerIdParam]);
+
+  useEffect(() => {
+    if (!estimate?.id) {
+      setEstimateFamily([]);
+      return;
+    }
+    let cancelled = false;
+    void listEstimateFamily(estimate.id)
+      .then((rows) => {
+        if (!cancelled) {
+          setEstimateFamily(rows);
+          if (rows.length > 1) setHistoryOpen(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setEstimateFamily([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [estimate?.id]);
+
+  useEffect(() => {
+    function syncFieldMode() {
+      setFieldMode(getFieldModeEnabled());
+    }
+    window.addEventListener("teq-field-mode-change", syncFieldMode);
+    window.addEventListener("storage", syncFieldMode);
+    return () => {
+      window.removeEventListener("teq-field-mode-change", syncFieldMode);
+      window.removeEventListener("storage", syncFieldMode);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!linkIds.customer_id) {
+      setCrmSites([]);
+      return;
+    }
+    let cancelled = false;
+    void listSites(linkIds.customer_id)
+      .then((rows) => {
+        if (!cancelled) setCrmSites(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load sites");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [linkIds.customer_id]);
+
+  useEffect(() => {
+    if (!linkIds.site_id) {
+      setCrmSurveys([]);
+      return;
+    }
+    let cancelled = false;
+    void listSurveys(linkIds.site_id)
+      .then((rows) => {
+        if (!cancelled) setCrmSurveys(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load surveys");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [linkIds.site_id]);
 
   useEffect(() => {
     if (!estimateId || !estimate || !ACTUALS_STATUSES.has(estimate.status)) {
@@ -306,14 +653,13 @@ export default function EstimateEditorPage() {
         if (cancelled) return;
         setJobActuals(row);
         setActualsForm({
-          materials_actual: String(row.materials_actual || ""),
-          labour_actual: String(row.labour_actual || ""),
-          waste_actual: String(row.waste_actual || ""),
-          travel_actual: String(row.travel_actual || ""),
-          prelims_actual: String(row.prelims_actual || ""),
-          other_actual: String(row.other_actual || ""),
-          revenue_actual:
-            row.revenue_actual != null ? String(row.revenue_actual) : "",
+          materials_actual: actualFieldValue(row.materials_actual),
+          labour_actual: actualFieldValue(row.labour_actual),
+          waste_actual: actualFieldValue(row.waste_actual),
+          travel_actual: actualFieldValue(row.travel_actual),
+          prelims_actual: actualFieldValue(row.prelims_actual),
+          other_actual: actualFieldValue(row.other_actual),
+          revenue_actual: actualFieldValue(row.revenue_actual),
           notes: row.notes || "",
         });
       })
@@ -361,6 +707,7 @@ export default function EstimateEditorPage() {
   }
 
   function toggleWorkType(code: string) {
+    if (isEstimateLocked(estimate?.status)) return;
     setItems((current) => {
       if (current.some((item) => item.work_type === code)) {
         return current.filter((item) => item.work_type !== code);
@@ -377,6 +724,7 @@ export default function EstimateEditorPage() {
   }
 
   function updateMeasurement(key: string, field: string, value: unknown) {
+    if (isEstimateLocked(estimate?.status)) return;
     setItems((current) =>
       current.map((item) =>
         item.key === key
@@ -386,7 +734,89 @@ export default function EstimateEditorPage() {
     );
   }
 
-  function buildPayload(extra?: Partial<EstimatePayload>): EstimatePayload {
+  function duplicateWorkItem(key: string) {
+    if (isEstimateLocked(estimate?.status)) return;
+    setItems((current) => {
+      const index = current.findIndex((item) => item.key === key);
+      if (index < 0) return current;
+      const source = current[index];
+      const clone: DraftItem = {
+        key: `${source.work_type}-${Date.now()}`,
+        work_type: source.work_type,
+        measurements: structuredClone(source.measurements),
+      };
+      const next = [...current];
+      next.splice(index + 1, 0, clone);
+      return next;
+    });
+  }
+
+  function removeWorkItem(key: string) {
+    if (isEstimateLocked(estimate?.status)) return;
+    setItems((current) => current.filter((item) => item.key !== key));
+  }
+
+  function moveWorkItem(key: string, direction: -1 | 1) {
+    if (isEstimateLocked(estimate?.status)) return;
+    setItems((current) => {
+      const index = current.findIndex((item) => item.key === key);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      const [row] = next.splice(index, 1);
+      next.splice(target, 0, row);
+      return next;
+    });
+  }
+
+  function ventilationRows(item: DraftItem) {
+    return (item.measurements.items as Array<Record<string, unknown>>) || [];
+  }
+
+  function updateVentilationRows(
+    itemKey: string,
+    rows: Array<Record<string, unknown>>,
+  ) {
+    updateMeasurement(itemKey, "items", rows);
+  }
+
+  function addVentilationRow(item: DraftItem) {
+    if (isEstimateLocked(estimate?.status)) return;
+    const materials = ventMaterials();
+    const defaultCode = materials[0]?.code || "MAT-EXTRACTOR-100";
+    updateVentilationRows(item.key, [
+      ...ventilationRows(item),
+      { code: defaultCode, quantity: 1, install: true },
+    ]);
+  }
+
+  function removeVentilationRow(item: DraftItem, index: number) {
+    if (isEstimateLocked(estimate?.status)) return;
+    const rows = ventilationRows(item).filter((_, rowIndex) => rowIndex !== index);
+    updateVentilationRows(
+      item.key,
+      rows.length
+        ? rows
+        : [{ code: "MAT-EXTRACTOR-100", quantity: 1, install: true }],
+    );
+  }
+
+  function moveVentilationRow(item: DraftItem, index: number, direction: -1 | 1) {
+    if (isEstimateLocked(estimate?.status)) return;
+    const rows = [...ventilationRows(item)];
+    const target = index + direction;
+    if (target < 0 || target >= rows.length) return;
+    const [row] = rows.splice(index, 1);
+    rows.splice(target, 0, row);
+    updateVentilationRows(item.key, rows);
+  }
+
+  function buildPayload(
+    extra?: Partial<EstimatePayload>,
+    overrideValues?: { sell: string; reason: string },
+  ): EstimatePayload {
+    const sellValue = overrideValues?.sell ?? overrideSell;
+    const reasonValue = overrideValues?.reason ?? overrideReason;
     return {
       ...customer,
       customer_id: linkIds.customer_id,
@@ -400,19 +830,30 @@ export default function EstimateEditorPage() {
         measurements: item.measurements,
         sort_order: index,
       })),
-      override_sell_price:
-        overrideSell.trim() === "" ? null : Number(overrideSell),
-      override_reason: overrideSell.trim() === "" ? "" : overrideReason,
-      clear_override: overrideSell.trim() === "",
+      override_sell_price: sellValue.trim() === "" ? null : Number(sellValue),
+      override_reason: sellValue.trim() === "" ? "" : reasonValue,
+      clear_override: sellValue.trim() === "",
       ...extra,
     };
   }
 
-  async function saveAndPrice(nextStep?: Step, status?: string) {
+  async function saveAndPrice(
+    nextStep?: Step,
+    status?: string,
+    overrideValues?: { sell: string; reason: string },
+  ) {
+    if (isEstimateLocked(estimate?.status)) {
+      setError(
+        "This estimate is locked. Create a revision to make commercial changes.",
+      );
+      return null;
+    }
     setSaving(true);
     setError(null);
     try {
-      if (overrideSell.trim() !== "" && overrideReason.trim() === "") {
+      const sellValue = overrideValues?.sell ?? overrideSell;
+      const reasonValue = overrideValues?.reason ?? overrideReason;
+      if (sellValue.trim() !== "" && reasonValue.trim() === "") {
         setError("Enter an override reason when setting an override sell price.");
         setSaving(false);
         return null;
@@ -435,7 +876,10 @@ export default function EstimateEditorPage() {
       }
       const updated = await updateEstimate(
         currentId,
-        buildPayload(status ? { status } : undefined),
+        buildPayload(status ? { status } : undefined, {
+          sell: sellValue,
+          reason: reasonValue,
+        }),
       );
       setEstimate(updated);
       setOverrideSell(
@@ -456,6 +900,7 @@ export default function EstimateEditorPage() {
         setQuotation(quote);
       }
       if (nextStep) setStep(nextStep);
+      setBaselineEpoch((value) => value + 1);
       return updated;
     } catch (err) {
       const message =
@@ -474,6 +919,18 @@ export default function EstimateEditorPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function onExplicitSave() {
+    await saveAndPrice();
+  }
+
+  function confirmLeaveWithoutSaving() {
+    if (!pendingLeaveHref) return;
+    const href = pendingLeaveHref;
+    setPendingLeaveHref(null);
+    setSavedDraftKey(draftKey);
+    navigate(href);
   }
 
   async function onApprove() {
@@ -495,6 +952,12 @@ export default function EstimateEditorPage() {
 
   async function onMarkQuoted() {
     if (!estimate) return;
+    if (quotation && quotation.lines_reconciled === false) {
+      setError(
+        "Quotation amounts do not reconcile. Recalculate pricing before marking as quoted.",
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -559,6 +1022,87 @@ export default function EstimateEditorPage() {
     }
   }
 
+  function requestMarkQuoted() {
+    if (!estimate) return;
+    if (quotation && quotation.lines_reconciled === false) {
+      setError(
+        "Quotation amounts do not reconcile. Recalculate pricing before marking as quoted.",
+      );
+      return;
+    }
+    setPendingConfirm({
+      title: "Issue quotation?",
+      message: quotation
+        ? `This locks ${estimate.reference} as the customer quotation.\n\nIssue date: ${formatUkDate(quotation.issue_date)}\nValid until: ${formatUkDate(quotation.valid_until)}\n\nCommercial details cannot be edited afterwards without creating a revision.`
+        : `This locks ${estimate.reference} as the customer quotation. Commercial details cannot be edited afterwards without creating a revision.`,
+      confirmLabel: "Issue quotation",
+      run: onMarkQuoted,
+    });
+  }
+
+  function requestCreateRevision() {
+    if (!estimate) return;
+    setPendingConfirm({
+      title: "Create revision?",
+      message:
+        "A new editable revision will be created from this estimate. The issued quotation on the current version will remain unchanged.",
+      confirmLabel: "Create revision",
+      run: onCreateRevision,
+    });
+  }
+
+  function requestMarkAccepted() {
+    if (!estimate) return;
+    const who = acceptForm.accepted_by_name.trim() || "the customer";
+    setPendingConfirm({
+      title: "Record acceptance?",
+      message: `This marks ${estimate.reference} as accepted by ${who}. Job actuals can then be recorded against the accepted quotation.`,
+      confirmLabel: "Record acceptance",
+      run: onMarkAccepted,
+    });
+  }
+
+  function requestLifecycleTransition(
+    status: "declined" | "expired" | "closed",
+  ) {
+    if (!estimate) return;
+    const copy = {
+      declined: {
+        title: "Record customer decline?",
+        message: `This records that the customer declined ${estimate.reference}. You can still create a revision later if needed.`,
+        confirmLabel: "Record decline",
+        tone: "danger" as const,
+      },
+      expired: {
+        title: "Record quotation expired?",
+        message: `This records that ${estimate.reference} expired because the quotation validity window has passed.`,
+        confirmLabel: "Record expired",
+        tone: "danger" as const,
+      },
+      closed: {
+        title: "Close estimate?",
+        message: `This closes ${estimate.reference} and removes it from active commercial follow-up. Closed estimates remain available for history and actuals where applicable.`,
+        confirmLabel: "Close estimate",
+        tone: "danger" as const,
+      },
+    }[status];
+    setPendingConfirm({
+      ...copy,
+      run: () => onLifecycleTransition(status),
+    });
+  }
+
+  async function runPendingConfirm() {
+    if (!pendingConfirm) return;
+    setConfirmBusy(true);
+    try {
+      await pendingConfirm.run();
+      setPendingConfirm(null);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
   async function onSaveActuals(event: FormEvent) {
     event.preventDefault();
     if (!estimateId) return;
@@ -566,19 +1110,26 @@ export default function EstimateEditorPage() {
     setError(null);
     try {
       const updated = await updateJobActuals(estimateId, {
-        materials_actual: Number(actualsForm.materials_actual || 0),
-        labour_actual: Number(actualsForm.labour_actual || 0),
-        waste_actual: Number(actualsForm.waste_actual || 0),
-        travel_actual: Number(actualsForm.travel_actual || 0),
-        prelims_actual: Number(actualsForm.prelims_actual || 0),
-        other_actual: Number(actualsForm.other_actual || 0),
-        revenue_actual:
-          actualsForm.revenue_actual.trim() === ""
-            ? null
-            : Number(actualsForm.revenue_actual),
+        materials_actual: moneyOrBlank(actualsForm.materials_actual),
+        labour_actual: moneyOrBlank(actualsForm.labour_actual),
+        waste_actual: moneyOrBlank(actualsForm.waste_actual),
+        travel_actual: moneyOrBlank(actualsForm.travel_actual),
+        prelims_actual: moneyOrBlank(actualsForm.prelims_actual),
+        other_actual: moneyOrBlank(actualsForm.other_actual),
+        revenue_actual: moneyOrBlank(actualsForm.revenue_actual),
         notes: actualsForm.notes,
       });
       setJobActuals(updated);
+      setActualsForm({
+        materials_actual: actualFieldValue(updated.materials_actual),
+        labour_actual: actualFieldValue(updated.labour_actual),
+        waste_actual: actualFieldValue(updated.waste_actual),
+        travel_actual: actualFieldValue(updated.travel_actual),
+        prelims_actual: actualFieldValue(updated.prelims_actual),
+        other_actual: actualFieldValue(updated.other_actual),
+        revenue_actual: actualFieldValue(updated.revenue_actual),
+        notes: updated.notes || "",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save actual costs");
     } finally {
@@ -588,7 +1139,202 @@ export default function EstimateEditorPage() {
 
   async function onCustomerSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!linkIds.customer_id || !linkIds.site_id) {
+      setError("Select a customer and site before continuing.");
+      return;
+    }
+    if (!customer.customer_name.trim()) {
+      setError("Customer name is required.");
+      return;
+    }
     await saveAndPrice("scope");
+  }
+
+  function applyCustomerRecord(row: Customer) {
+    setCustomer((current) => ({
+      ...current,
+      customer_name: row.name,
+      company_name: row.company_name || "",
+      email: row.email || "",
+      telephone: row.telephone || "",
+    }));
+  }
+
+  function applySiteRecord(row: Site) {
+    setCustomer((current) => ({
+      ...current,
+      site_address: formatSiteAddress(row),
+      postcode: row.postcode || "",
+    }));
+  }
+
+  async function onSelectCustomer(customerId: number | null) {
+    setShowAddSite(false);
+    setLinkedSurveyRef(null);
+    if (!customerId) {
+      setLinkIds({ customer_id: null, site_id: null, survey_id: null });
+      setCrmSites([]);
+      setCrmSurveys([]);
+      return;
+    }
+    const row = crmCustomers.find((item) => item.id === customerId);
+    setLinkIds({ customer_id: customerId, site_id: null, survey_id: null });
+    setCrmSurveys([]);
+    if (row) applyCustomerRecord(row);
+    try {
+      const sites = await listSites(customerId);
+      setCrmSites(sites);
+      if (sites.length === 1) {
+        setLinkIds({
+          customer_id: customerId,
+          site_id: sites[0].id,
+          survey_id: null,
+        });
+        applySiteRecord(sites[0]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load sites");
+    }
+  }
+
+  async function onSelectSite(siteId: number | null) {
+    setLinkedSurveyRef(null);
+    if (!siteId || !linkIds.customer_id) {
+      setLinkIds((current) => ({
+        ...current,
+        site_id: null,
+        survey_id: null,
+      }));
+      setCrmSurveys([]);
+      return;
+    }
+    const row = crmSites.find((item) => item.id === siteId);
+    setLinkIds((current) => ({
+      ...current,
+      site_id: siteId,
+      survey_id: null,
+    }));
+    if (row) applySiteRecord(row);
+    try {
+      const surveys = await listSurveys(siteId);
+      setCrmSurveys(surveys);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load surveys");
+    }
+  }
+
+  function onSelectSurvey(surveyId: number | null) {
+    if (!surveyId) {
+      setLinkIds((current) => ({ ...current, survey_id: null }));
+      setLinkedSurveyRef(null);
+      return;
+    }
+    const row = crmSurveys.find((item) => item.id === surveyId);
+    setLinkIds((current) => ({ ...current, survey_id: surveyId }));
+    if (!row) return;
+    setLinkedSurveyRef(row.reference);
+    setCustomer((current) => ({
+      ...current,
+      surveyor: row.surveyor_name || current.surveyor,
+      survey_date: row.survey_date || current.survey_date,
+      notes:
+        current.notes.trim() ||
+        [row.diagnosis_summary, row.recommended_works, row.notes]
+          .filter(Boolean)
+          .join("\n\n"),
+    }));
+  }
+
+  async function onCreateCrmCustomer(event: FormEvent) {
+    event.preventDefault();
+    const name = newCustomerForm.name.trim();
+    if (!name) {
+      setError("Enter a customer name.");
+      return;
+    }
+    setCrmBusy(true);
+    setError(null);
+    try {
+      const created = await createCustomer({
+        name,
+        customer_type: newCustomerForm.customer_type,
+        telephone: newCustomerForm.telephone.trim(),
+        email: newCustomerForm.email.trim(),
+      });
+      setCrmCustomers((current) =>
+        [...current, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setShowAddCustomer(false);
+      setNewCustomerForm({
+        name: "",
+        customer_type: "homeowner",
+        telephone: "",
+        email: "",
+      });
+      await onSelectCustomer(created.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create customer");
+    } finally {
+      setCrmBusy(false);
+    }
+  }
+
+  async function onCreateCrmSite(event: FormEvent) {
+    event.preventDefault();
+    if (!linkIds.customer_id) {
+      setError("Select a customer before adding a site.");
+      return;
+    }
+    const address = newSiteForm.address_line1.trim();
+    if (!address) {
+      setError("Enter a site address.");
+      return;
+    }
+    setCrmBusy(true);
+    setError(null);
+    try {
+      const created = await createSite(linkIds.customer_id, {
+        label: newSiteForm.label.trim() || "Main property",
+        address_line1: address,
+        town: newSiteForm.town.trim(),
+        postcode: newSiteForm.postcode.trim(),
+      });
+      setCrmSites((current) => [...current, created]);
+      setShowAddSite(false);
+      setNewSiteForm({
+        label: "Main property",
+        address_line1: "",
+        town: "",
+        postcode: "",
+      });
+      await onSelectSite(created.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create site");
+    } finally {
+      setCrmBusy(false);
+    }
+  }
+
+  async function onCreateCrmSurvey() {
+    if (!linkIds.site_id) {
+      setError("Select a site before creating a survey.");
+      return;
+    }
+    setCrmBusy(true);
+    setError(null);
+    try {
+      const created = await createSurvey(linkIds.site_id, {
+        survey_date: customer.survey_date || undefined,
+        surveyor_name: customer.surveyor || undefined,
+        notes: customer.notes || undefined,
+      });
+      setCrmSurveys((current) => [created, ...current]);
+      onSelectSurvey(created.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create survey");
+    } finally {
+      setCrmBusy(false);
+    }
   }
 
   function travelRates() {
@@ -617,15 +1363,149 @@ export default function EstimateEditorPage() {
   const canApprove = Boolean(user?.permissions?.includes("approve_override"));
   const canManageActuals = Boolean(user?.permissions?.includes("manage_actuals"));
   const showActuals = Boolean(estimate && ACTUALS_STATUSES.has(estimate.status));
-  const locked = Boolean(
-    estimate &&
-      ["quoted", "accepted", "declined", "expired", "closed"].includes(
-        estimate.status,
-      ),
-  );
+  const locked = isEstimateLocked(estimate?.status);
+  const quoteAmountsOk = quotation?.lines_reconciled !== false;
+  const saveStateLabel = saving
+    ? "Saving…"
+    : isDirty
+      ? "Unsaved changes"
+      : lastSavedAt
+        ? `Saved ${formatUkTime(lastSavedAt)}`
+        : "Not saved yet";
+  const saveStateTone = saving
+    ? "is-saving"
+    : isDirty
+      ? "is-unsaved"
+      : lastSavedAt
+        ? "is-saved"
+        : "is-idle";
+
+  const primaryCommand = (() => {
+    if (!estimate) return null;
+    if (estimate.status === "review_required" && canApprove) {
+      return {
+        label: "Approve for quotation",
+        disabled: saving,
+        onClick: () => void onApprove(),
+      };
+    }
+    if (estimate.status === "ready_to_quote") {
+      return {
+        label: "Issue quotation",
+        disabled: saving || (quotation != null && !quoteAmountsOk),
+        onClick: () => requestMarkQuoted(),
+      };
+    }
+    if (estimate.status === "quoted") {
+      return {
+        label: showAcceptForm ? "Hide acceptance form" : "Record acceptance",
+        disabled: saving,
+        onClick: () => setShowAcceptForm((open) => !open),
+      };
+    }
+    if (estimate.status === "accepted" && showActuals) {
+      return {
+        label: "Job actuals",
+        disabled: saving,
+        onClick: () => void goToStep("actuals"),
+      };
+    }
+    if (
+      locked ||
+      estimate.status === "approved"
+    ) {
+      return {
+        label: "Create revision",
+        disabled: saving,
+        onClick: () => requestCreateRevision(),
+      };
+    }
+    return null;
+  })();
+
+  const moreCommandItems: ActionMenuItem[] = (() => {
+    if (!estimate) return [];
+    const items: ActionMenuItem[] = [];
+    const canRevise =
+      locked ||
+      estimate.status === "ready_to_quote" ||
+      estimate.status === "approved";
+
+    if (estimate.status === "quoted") {
+      items.push(
+        {
+          id: "declined",
+          label: "Record decline",
+          disabled: saving,
+          tone: "danger",
+          onClick: () => requestLifecycleTransition("declined"),
+        },
+        {
+          id: "expired",
+          label: "Record expired",
+          disabled: saving,
+          tone: "danger",
+          onClick: () => requestLifecycleTransition("expired"),
+        },
+      );
+    }
+
+    if (showActuals && estimate.status !== "accepted") {
+      items.push({
+        id: "actuals",
+        label: "Job actuals",
+        disabled: saving,
+        onClick: () => void goToStep("actuals"),
+      });
+    }
+
+    if (canRevise && primaryCommand?.label !== "Create revision") {
+      items.push({
+        id: "revision",
+        label: "Create revision",
+        disabled: saving,
+        onClick: () => requestCreateRevision(),
+      });
+    }
+
+    if (estimateFamily.length > 1) {
+      items.push({
+        id: "history",
+        label: historyOpen ? "Hide quotation history" : "View quotation history",
+        disabled: saving,
+        onClick: () => setHistoryOpen((open) => !open),
+      });
+    }
+
+    if (
+      estimate.status === "quoted" ||
+      estimate.status === "accepted" ||
+      estimate.status === "declined" ||
+      estimate.status === "expired"
+    ) {
+      items.push({
+        id: "close",
+        label: "Close estimate",
+        disabled: saving,
+        tone: "danger",
+        onClick: () => requestLifecycleTransition("closed"),
+      });
+    }
+
+    if (estimate.status === "ready_to_quote" && step !== "quotation") {
+      items.push({
+        id: "view-quote",
+        label: "View quotation",
+        disabled: saving,
+        onClick: () => void goToStep("quotation"),
+      });
+    }
+
+    return items;
+  })();
 
   return (
-    <section className="stack">
+    <section className={`stack${locked ? " estimate-editor-locked" : ""}`}>
       <div className="page-header page-header-compact">
         <h1 className="page-title">
           {estimate ? `Estimate ${estimate.reference}` : "New estimate"}
@@ -634,29 +1514,71 @@ export default function EstimateEditorPage() {
           <p className="page-subtitle">
             {estimate.customer_name}
             {estimate.postcode ? ` · ${estimate.postcode}` : ""}
+            {estimate.revision_no && estimate.revision_no > 1
+              ? ` · Revision R${estimate.revision_no}`
+              : ""}
           </p>
         ) : null}
         <p className="page-lead">
-          Move from survey details to a margin-controlled quotation.
+          {locked
+            ? "This commercial version is locked. Review the quotation or create a revision to edit."
+            : "Move from survey details to a margin-controlled quotation."}
         </p>
+        {estimate && estimateFamily.length > 1
+          ? (() => {
+              const prior = [...estimateFamily]
+                .reverse()
+                .find(
+                  (row) =>
+                    row.id !== estimate.id &&
+                    (row.status === "quoted" ||
+                      row.status === "accepted" ||
+                      (row.revision_no || 1) < (estimate.revision_no || 1)),
+                );
+              if (!prior) return null;
+              return (
+                <p className="muted" style={{ margin: "0.25rem 0 0" }}>
+                  Based on {prior.reference} (
+                  {formatEstimateStatus(prior.status)}) · Created{" "}
+                  {formatUkDate(estimate.created_at)}
+                </p>
+              );
+            })()
+          : null}
       </div>
 
-      {estimate ? (
+      {estimate || !locked ? (
         <div className="estimate-command-bar">
           <div className="estimate-command-meta">
-            <span className={`status-pill ${statusTone(estimate.status)}`}>
-              {formatStatusLabel(estimate.status)}
-              {estimate.revision_no && estimate.revision_no > 1
-                ? ` · rev ${estimate.revision_no}`
-                : ""}
-            </span>
-            {estimate.sell_price > 0 ? (
+            {estimate ? (
+              <StatusPill
+                status={estimate.status}
+                locked={locked}
+                suffix={
+                  estimate.revision_no && estimate.revision_no > 1
+                    ? `rev ${estimate.revision_no}`
+                    : undefined
+                }
+              />
+            ) : (
+              <StatusPill status="draft" />
+            )}
+            {!locked ? (
+              <span
+                className={`save-state-chip ${saveStateTone}`}
+                role="status"
+                aria-live="polite"
+              >
+                {saveStateLabel}
+              </span>
+            ) : null}
+            {estimate && estimate.sell_price > 0 ? (
               <span className="estimate-meta-chip">
                 <span className="estimate-meta-chip-label">Sell</span>
                 {formatMoney(estimate.sell_price)}
               </span>
             ) : null}
-            {estimate.margin_percent > 0 ? (
+            {estimate && estimate.margin_percent > 0 ? (
               <span className="estimate-meta-chip">
                 <span className="estimate-meta-chip-label">Margin</span>
                 {estimate.margin_percent.toFixed(1)}%
@@ -664,118 +1586,124 @@ export default function EstimateEditorPage() {
             ) : null}
           </div>
           <div className="estimate-command-actions">
-            {estimate.status === "review_required" && canApprove ? (
-              <div className="action-group" role="group" aria-label="Approval">
-                <span className="action-group-label">Approval</span>
-                <button
-                  className="btn btn-primary"
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void onApprove()}
-                >
-                  Approve for quotation
-                </button>
-              </div>
+            {!locked && isDirty ? (
+              <button
+                className="btn btn-secondary"
+                type="button"
+                disabled={saving}
+                onClick={() => void onExplicitSave()}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
             ) : null}
-            {(estimate.status === "ready_to_quote" ||
-              estimate.status === "quoted") ? (
-              <div className="action-group" role="group" aria-label="Quotation">
-                <span className="action-group-label">Quotation</span>
-                {estimate.status === "ready_to_quote" ? (
-                  <button
-                    className="btn btn-primary"
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void onMarkQuoted()}
-                  >
-                    Mark as quoted
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      className="btn btn-primary"
-                      type="button"
-                      disabled={saving}
-                      onClick={() => setShowAcceptForm((open) => !open)}
-                    >
-                      {showAcceptForm ? "Hide accept form" : "Mark as accepted"}
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void onLifecycleTransition("declined")}
-                    >
-                      Declined
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void onLifecycleTransition("expired")}
-                    >
-                      Expired
-                    </button>
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void onLifecycleTransition("closed")}
-                    >
-                      Close
-                    </button>
-                  </>
-                )}
-              </div>
+            {estimate && primaryCommand ? (
+              <button
+                className="btn btn-primary"
+                type="button"
+                disabled={primaryCommand.disabled}
+                onClick={primaryCommand.onClick}
+              >
+                {primaryCommand.label}
+              </button>
             ) : null}
-            {["accepted", "declined", "expired"].includes(estimate.status) ? (
-              <div className="action-group" role="group" aria-label="Close job">
-                <span className="action-group-label">Outcome</span>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void onLifecycleTransition("closed")}
-                >
-                  Close estimate
-                </button>
-              </div>
-            ) : null}
-            {showActuals ? (
-              <div className="action-group" role="group" aria-label="Post-job">
-                <span className="action-group-label">Post-job</span>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  onClick={() => void goToStep("actuals")}
-                >
-                  Job actuals
-                </button>
-              </div>
-            ) : null}
-            {locked ||
-            estimate.status === "ready_to_quote" ||
-            estimate.status === "approved" ? (
-              <div className="action-group" role="group" aria-label="Revision">
-                <span className="action-group-label">Revision</span>
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void onCreateRevision()}
-                >
-                  Create revision
-                </button>
-              </div>
+            {estimate ? (
+              <ActionMenu items={moreCommandItems} disabled={saving} />
             ) : null}
           </div>
         </div>
       ) : null}
 
+      {fieldMode && !locked ? (
+        <div className="info-banner" role="status">
+          <strong>Field mode</strong>
+          <span>
+            {" "}
+            Compact site entry is on. Focus on measurements and save often;
+            quotation issue stays on the Quotation step.
+          </span>
+        </div>
+      ) : null}
+
       {locked ? (
-        <div className="info-banner">
-          This estimate is locked ({estimate?.status.replaceAll("_", " ")}).
-          Create a revision to make commercial changes.
+        <div className="lock-banner" role="status">
+          <div className="lock-banner-copy">
+            <strong>Estimate locked</strong>
+            <p>
+              This version is {estimate?.status.replaceAll("_", " ")} and
+              commercial fields are read-only. Create a revision to change
+              scope, measurements, or pricing.
+            </p>
+          </div>
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={saving}
+            onClick={() => requestCreateRevision()}
+          >
+            Create revision
+          </button>
+        </div>
+      ) : null}
+
+      {estimate && estimateFamily.length > 1 && historyOpen ? (
+        <div className="panel stack revision-history-panel" id="quotation-history">
+          <div className="toolbar">
+            <h2 className="panel-title" style={{ margin: 0 }}>
+              Quotation history
+            </h2>
+            <button
+              className="btn btn-secondary btn-compact"
+              type="button"
+              onClick={() => setHistoryOpen(false)}
+            >
+              Hide
+            </button>
+          </div>
+          <div className="variance-table-wrap">
+            <table className="revision-history-list">
+              <thead>
+                <tr>
+                  <th scope="col">Revision</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" className="is-num">
+                    Sell
+                  </th>
+                  <th scope="col">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estimateFamily.map((row) => {
+                  const revLabel =
+                    row.revision_no && row.revision_no > 1
+                      ? `R${row.revision_no}`
+                      : "R1";
+                  return (
+                    <tr
+                      key={row.id}
+                      className={row.id === estimate.id ? "is-current" : undefined}
+                    >
+                      <td>
+                        {row.id === estimate.id ? (
+                          <strong>
+                            {revLabel} · {row.reference}
+                          </strong>
+                        ) : (
+                          <Link to={`/estimates/${row.id}`}>
+                            {revLabel} · {row.reference}
+                          </Link>
+                        )}
+                      </td>
+                      <td>{formatEstimateStatus(row.status)}</td>
+                      <td className="is-num">
+                        {row.sell_price > 0 ? formatMoney(row.sell_price) : "—"}
+                      </td>
+                      <td>{formatUkDate(row.created_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
 
@@ -784,7 +1712,7 @@ export default function EstimateEditorPage() {
           className="panel stack"
           onSubmit={(event) => {
             event.preventDefault();
-            void onMarkAccepted();
+            requestMarkAccepted();
           }}
         >
           <h2 className="panel-title">Record acceptance</h2>
@@ -877,6 +1805,7 @@ export default function EstimateEditorPage() {
           {estimate.acceptance_method
             ? ` via ${estimate.acceptance_method}`
             : ""}
+          {` on ${formatUkDateTime(estimate.accepted_at)}`}
           {estimate.acceptance_po_reference
             ? ` · PO ${estimate.acceptance_po_reference}`
             : ""}
@@ -884,14 +1813,53 @@ export default function EstimateEditorPage() {
         </div>
       ) : null}
 
-      {linkedSurveyRef ? (
+      {linkedSurveyRef || selectedCrmCustomer || selectedCrmSite ? (
         <div className="info-banner">
-          Linked to survey <strong>{linkedSurveyRef}</strong>
-          {linkIds.customer_id ? ` · customer #${linkIds.customer_id}` : ""}
-          {linkIds.site_id ? ` · site #${linkIds.site_id}` : ""}.
+          {selectedCrmCustomer ? (
+            <>
+              Customer <strong>{customerLabel(selectedCrmCustomer)}</strong>
+              {selectedCrmCustomer.telephone
+                ? ` · ${selectedCrmCustomer.telephone}`
+                : ""}
+              {selectedCrmCustomer.email
+                ? ` · ${selectedCrmCustomer.email}`
+                : ""}
+            </>
+          ) : (
+            "Customer details"
+          )}
+          {selectedCrmSite ? (
+            <>
+              {" · "}
+              Site <strong>{selectedCrmSite.label || "Property"}</strong>
+              {selectedCrmSite.postcode
+                ? ` · ${selectedCrmSite.postcode}`
+                : ""}
+            </>
+          ) : null}
+          {linkedSurveyRef ? (
+            <>
+              {" · "}
+              Survey <strong>{linkedSurveyRef}</strong>
+            </>
+          ) : null}
+          .
         </div>
       ) : null}
 
+      <p className="workflow-progress" aria-live="polite">
+        {(() => {
+          const visible = STEPS.filter(
+            (item) => item.id !== "actuals" || showActuals,
+          );
+          const index = Math.max(
+            0,
+            visible.findIndex((item) => item.id === step),
+          );
+          const current = visible[index];
+          return `${index + 1} of ${visible.length} · ${current?.label || "Estimate"}`;
+        })()}
+      </p>
       <ul className="workflow-stepper" aria-label="Estimating workflow">
         {STEPS.filter(
           (item) => item.id !== "actuals" || showActuals,
@@ -919,108 +1887,450 @@ export default function EstimateEditorPage() {
       {error ? <div className="error-banner">{error}</div> : null}
 
       {step === "customer" ? (
-        <form className="panel stack" onSubmit={onCustomerSubmit}>
+        <form
+          className={`panel stack${locked ? " is-readonly" : ""}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (locked) {
+              setStep("scope");
+              return;
+            }
+            void onCustomerSubmit(event);
+          }}
+        >
           <h2 className="panel-title">Customer &amp; site</h2>
-          <div className="row">
+          <p className="muted">
+            {locked
+              ? "Read-only CRM snapshot for this quoted revision."
+              : "Link a customer and site from CRM. Identifying details come from those records."}
+          </p>
+          {!locked && !linkIds.customer_id && customer.customer_name ? (
+            <div className="info-banner">
+              This estimate still has free-text details
+              ({customer.customer_name}). Select a customer and site to link CRM
+              records before continuing.
+            </div>
+          ) : null}
+          <fieldset className="readonly-fieldset" disabled={locked}>
+            <div className="row">
+              <div className="field">
+                <label htmlFor="crm_customer_search">Customer</label>
+                <input
+                  id="crm_customer_search"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  placeholder="Search customers…"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="crm_customer">Select customer</label>
+                <select
+                  id="crm_customer"
+                  required={!locked}
+                  value={linkIds.customer_id ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    void onSelectCustomer(value ? Number(value) : null);
+                  }}
+                >
+                  <option value="">Select customer…</option>
+                  {filteredCustomers.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {customerLabel(row)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {!locked ? (
+              <div className="step-actions" style={{ marginTop: 0 }}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => setShowAddCustomer((open) => !open)}
+                >
+                  {showAddCustomer ? "Cancel new customer" : "Add new customer"}
+                </button>
+              </div>
+            ) : null}
+            {showAddCustomer && !locked ? (
+              <div className="panel stack" style={{ margin: 0 }}>
+                <h3 className="panel-title" style={{ fontSize: "1rem" }}>
+                  New customer
+                </h3>
+                <div className="row">
+                  <div className="field">
+                    <label htmlFor="new_customer_name">Name</label>
+                    <input
+                      id="new_customer_name"
+                      value={newCustomerForm.name}
+                      onChange={(e) =>
+                        setNewCustomerForm({
+                          ...newCustomerForm,
+                          name: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="new_customer_type">Type</label>
+                    <select
+                      id="new_customer_type"
+                      value={newCustomerForm.customer_type}
+                      onChange={(e) =>
+                        setNewCustomerForm({
+                          ...newCustomerForm,
+                          customer_type: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="homeowner">Homeowner</option>
+                      <option value="landlord">Landlord</option>
+                      <option value="agent">Agent</option>
+                      <option value="commercial">Commercial</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="field">
+                    <label htmlFor="new_customer_telephone">Telephone</label>
+                    <input
+                      id="new_customer_telephone"
+                      value={newCustomerForm.telephone}
+                      onChange={(e) =>
+                        setNewCustomerForm({
+                          ...newCustomerForm,
+                          telephone: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="new_customer_email">Email</label>
+                    <input
+                      id="new_customer_email"
+                      type="email"
+                      value={newCustomerForm.email}
+                      onChange={(e) =>
+                        setNewCustomerForm({
+                          ...newCustomerForm,
+                          email: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={crmBusy}
+                  onClick={(event) => void onCreateCrmCustomer(event)}
+                >
+                  {crmBusy ? "Saving…" : "Save customer"}
+                </button>
+              </div>
+            ) : null}
+
+            {selectedCrmCustomer ? (
+              <div className="crm-summary">
+                <div>
+                  <span className="muted">Contact</span>
+                  <div>
+                    {selectedCrmCustomer.telephone || "No telephone"}
+                    {selectedCrmCustomer.email
+                      ? ` · ${selectedCrmCustomer.email}`
+                      : ""}
+                  </div>
+                </div>
+                <div>
+                  <span className="muted">Type</span>
+                  <div>{selectedCrmCustomer.customer_type}</div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="row">
+              <div className="field">
+                <label htmlFor="crm_site">Site</label>
+                <select
+                  id="crm_site"
+                  required={!locked}
+                  disabled={!linkIds.customer_id}
+                  value={linkIds.site_id ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    void onSelectSite(value ? Number(value) : null);
+                  }}
+                >
+                  <option value="">
+                    {linkIds.customer_id
+                      ? "Select site…"
+                      : "Select a customer first"}
+                  </option>
+                  {crmSites.map((site) => (
+                    <option key={site.id} value={site.id}>
+                      {site.label || "Property"}
+                      {site.postcode ? ` · ${site.postcode}` : ""}
+                      {site.address_line1 ? ` — ${site.address_line1}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="crm_survey">Survey</label>
+                <select
+                  id="crm_survey"
+                  disabled={!linkIds.site_id}
+                  value={linkIds.survey_id ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    onSelectSurvey(value ? Number(value) : null);
+                  }}
+                >
+                  <option value="">
+                    {linkIds.site_id
+                      ? "Optional — select or create survey"
+                      : "Select a site first"}
+                  </option>
+                  {crmSurveys.map((survey) => (
+                    <option key={survey.id} value={survey.id}>
+                      {survey.reference}
+                      {survey.survey_date
+                        ? ` · ${formatUkDate(survey.survey_date)}`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {!locked && linkIds.customer_id ? (
+              <div className="step-actions" style={{ marginTop: 0 }}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  onClick={() => setShowAddSite((open) => !open)}
+                >
+                  {showAddSite ? "Cancel new site" : "Add site"}
+                </button>
+                {linkIds.site_id ? (
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    disabled={crmBusy}
+                    onClick={() => void onCreateCrmSurvey()}
+                  >
+                    {crmBusy ? "Creating…" : "Create survey"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {showAddSite && !locked && linkIds.customer_id ? (
+              <div className="panel stack" style={{ margin: 0 }}>
+                <h3 className="panel-title" style={{ fontSize: "1rem" }}>
+                  New site
+                </h3>
+                <div className="row">
+                  <div className="field">
+                    <label htmlFor="new_site_label">Label</label>
+                    <input
+                      id="new_site_label"
+                      value={newSiteForm.label}
+                      onChange={(e) =>
+                        setNewSiteForm({
+                          ...newSiteForm,
+                          label: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="new_site_address">Address</label>
+                    <input
+                      id="new_site_address"
+                      value={newSiteForm.address_line1}
+                      onChange={(e) =>
+                        setNewSiteForm({
+                          ...newSiteForm,
+                          address_line1: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="field">
+                    <label htmlFor="new_site_town">Town</label>
+                    <input
+                      id="new_site_town"
+                      value={newSiteForm.town}
+                      onChange={(e) =>
+                        setNewSiteForm({
+                          ...newSiteForm,
+                          town: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="new_site_postcode">Postcode</label>
+                    <input
+                      id="new_site_postcode"
+                      value={newSiteForm.postcode}
+                      onChange={(e) =>
+                        setNewSiteForm({
+                          ...newSiteForm,
+                          postcode: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  disabled={crmBusy}
+                  onClick={(event) => void onCreateCrmSite(event)}
+                >
+                  {crmBusy ? "Saving…" : "Save site"}
+                </button>
+              </div>
+            ) : null}
+
+            {selectedCrmSite || customer.site_address ? (
+              <div className="crm-summary">
+                <div>
+                  <span className="muted">Site address</span>
+                  <div>
+                    {selectedCrmSite
+                      ? formatSiteAddress(selectedCrmSite)
+                      : customer.site_address}
+                    {(selectedCrmSite?.postcode || customer.postcode)
+                      ? ` · ${selectedCrmSite?.postcode || customer.postcode}`
+                      : ""}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="row">
+              <div className="field">
+                <label htmlFor="surveyor">Surveyor</label>
+                <input
+                  id="surveyor"
+                  value={customer.surveyor}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, surveyor: e.target.value })
+                  }
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="survey_date">Survey date</label>
+                <input
+                  id="survey_date"
+                  type="date"
+                  value={customer.survey_date}
+                  onChange={(e) =>
+                    setCustomer({ ...customer, survey_date: e.target.value })
+                  }
+                />
+              </div>
+            </div>
             <div className="field">
-              <label htmlFor="customer_name">Customer name</label>
-              <input
-                id="customer_name"
-                required
-                value={customer.customer_name}
+              <label htmlFor="notes">Survey notes</label>
+              <textarea
+                id="notes"
+                rows={3}
+                value={customer.notes}
                 onChange={(e) =>
-                  setCustomer({ ...customer, customer_name: e.target.value })
+                  setCustomer({ ...customer, notes: e.target.value })
                 }
               />
             </div>
-            <div className="field">
-              <label htmlFor="surveyor">Surveyor</label>
-              <input
-                id="surveyor"
-                value={customer.surveyor}
-                onChange={(e) =>
-                  setCustomer({ ...customer, surveyor: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="site_address">Site address</label>
-            <input
-              id="site_address"
-              value={customer.site_address}
-              onChange={(e) =>
-                setCustomer({ ...customer, site_address: e.target.value })
-              }
-            />
-          </div>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="postcode">Postcode</label>
-              <input
-                id="postcode"
-                value={customer.postcode}
-                onChange={(e) =>
-                  setCustomer({ ...customer, postcode: e.target.value })
-                }
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="survey_date">Survey date</label>
-              <input
-                id="survey_date"
-                type="date"
-                value={customer.survey_date}
-                onChange={(e) =>
-                  setCustomer({ ...customer, survey_date: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="notes">Survey notes</label>
-            <textarea
-              id="notes"
-              rows={3}
-              value={customer.notes}
-              onChange={(e) =>
-                setCustomer({ ...customer, notes: e.target.value })
-              }
-            />
-          </div>
+          </fieldset>
           <div className="step-actions">
             <Link className="btn btn-secondary" to="/">
-              Cancel
+              Back to estimates
             </Link>
-            <button className="btn btn-primary" disabled={saving}>
-              {saving ? "Saving…" : "Continue to work scope"}
+            <button className="btn btn-primary" disabled={saving || crmBusy}>
+              {saving
+                ? "Saving…"
+                : locked
+                  ? "View work scope"
+                  : "Continue to work scope"}
             </button>
           </div>
         </form>
       ) : null}
 
       {step === "scope" ? (
-        <div className="panel stack">
+        <div className={`panel stack${locked ? " is-readonly" : ""}`}>
           <h2 className="panel-title">Work scope</h2>
           <p className="muted">
-            Select one or more treatment types identified on site.
+            {locked
+              ? "Work types included in this locked commercial version."
+              : "Select the services included in the proposed works."}
           </p>
-          <div className="scope-grid">
-            {workTypes.map((type) => {
-              const active = selectedTypes.has(type.code);
-              return (
-                <button
-                  key={type.code}
-                  type="button"
-                  className={`scope-card ${active ? "is-selected" : ""}`}
-                  onClick={() => toggleWorkType(type.code)}
-                >
-                  <strong>{type.label}</strong>
-                  <span>{active ? "Selected" : "Add to estimate"}</span>
-                </button>
-              );
-            })}
-          </div>
+          {!locked ? (
+            <div className="field">
+              <label htmlFor="work-type-search">Search work types</label>
+              <input
+                id="work-type-search"
+                type="search"
+                placeholder="Name, code, or category…"
+                value={workTypeSearch}
+                onChange={(event) => setWorkTypeSearch(event.target.value)}
+                autoComplete="off"
+              />
+            </div>
+          ) : null}
+          {workTypeGroups.length === 0 ? (
+            <div className="empty-state">
+              <strong>No work types match</strong>
+              <p className="muted">Try a different search term.</p>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => setWorkTypeSearch("")}
+              >
+                Clear search
+              </button>
+            </div>
+          ) : (
+            workTypeGroups.map(([category, types]) => (
+              <div key={category} className="stack" style={{ gap: "0.55rem" }}>
+                <h3 className="scope-category-title">{category}</h3>
+                <div className="scope-grid">
+                  {types.map((type) => {
+                    const active = selectedTypes.has(type.code);
+                    return (
+                      <button
+                        key={type.code}
+                        type="button"
+                        className={`scope-card${active ? " is-selected" : ""}${locked ? " is-locked" : ""}`}
+                        disabled={locked}
+                        aria-pressed={active}
+                        onClick={() => toggleWorkType(type.code)}
+                      >
+                        <strong>
+                          {active ? "✓ " : ""}
+                          {type.label}
+                        </strong>
+                        <span>
+                          {locked
+                            ? active
+                              ? "Included in quoted revision"
+                              : "Not included"
+                            : active
+                              ? "Selected"
+                              : "Add to estimate"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
           <div className="step-actions">
             <button
               className="btn btn-secondary"
@@ -1035,20 +2345,84 @@ export default function EstimateEditorPage() {
               disabled={!items.length || saving}
               onClick={() => setStep("measurements")}
             >
-              Continue to measurements
+              {locked ? "View measurements" : "Continue to measurements"}
             </button>
           </div>
         </div>
       ) : null}
 
       {step === "measurements" ? (
-        <div className="stack">
-          {items.map((item) => (
-            <div className="panel stack" key={item.key}>
-              <h2 className="panel-title">
-                {workTypes.find((w) => w.code === item.work_type)?.label ||
-                  item.work_type}
-              </h2>
+        <div className={`stack${locked ? " is-readonly" : ""}`}>
+          {locked ? (
+            <p className="muted">
+              Measurements and allowances are read-only on this locked revision.
+            </p>
+          ) : null}
+          <fieldset className="readonly-fieldset" disabled={locked}>
+          {items.map((item, itemIndex) => {
+            const workLabel =
+              workTypes.find((w) => w.code === item.work_type)?.label ||
+              item.work_type;
+            const sameTypeCount = items.filter(
+              (row) => row.work_type === item.work_type,
+            ).length;
+            const sameTypeIndex =
+              items
+                .slice(0, itemIndex + 1)
+                .filter((row) => row.work_type === item.work_type).length;
+            const ventRows =
+              item.work_type === "ventilation_installation"
+                ? ventilationRows(item)
+                : [];
+
+            return (
+            <div className="panel stack measurement-item-panel" key={item.key}>
+              <div className="measurement-item-header">
+                <div>
+                  <p className="measurement-item-index muted">
+                    Item {itemIndex + 1}
+                    {sameTypeCount > 1 ? ` · ${workLabel} #${sameTypeIndex}` : ""}
+                  </p>
+                  <h2 className="panel-title" style={{ margin: 0 }}>
+                    {workLabel}
+                  </h2>
+                </div>
+                {!locked ? (
+                  <div className="measurement-item-actions">
+                    <button
+                      className="btn btn-secondary btn-compact"
+                      type="button"
+                      disabled={itemIndex === 0}
+                      onClick={() => moveWorkItem(item.key, -1)}
+                    >
+                      Move up
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-compact"
+                      type="button"
+                      disabled={itemIndex >= items.length - 1}
+                      onClick={() => moveWorkItem(item.key, 1)}
+                    >
+                      Move down
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-compact"
+                      type="button"
+                      onClick={() => duplicateWorkItem(item.key)}
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      className="btn btn-secondary btn-compact"
+                      type="button"
+                      disabled={items.length <= 1}
+                      onClick={() => removeWorkItem(item.key)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : null}
+              </div>
               {item.work_type === "injection_replaster" ? (
                 <div className="row">
                   <div className="field">
@@ -1283,112 +2657,169 @@ export default function EstimateEditorPage() {
               ) : null}
 
               {item.work_type === "ventilation_installation" ? (
-                <div className="stack">
-                  {((item.measurements.items as Array<Record<string, unknown>>) || []).map(
-                    (ventItem, index) => (
-                      <div className="row" key={`${item.key}-vent-${index}`}>
-                        <div className="field">
-                          <label>Equipment</label>
-                          <select
-                            value={String(ventItem.code || "")}
-                            onChange={(e) => {
-                              const next = [
-                                ...((item.measurements.items as Array<
-                                  Record<string, unknown>
-                                >) || []),
-                              ];
-                              next[index] = { ...ventItem, code: e.target.value };
-                              updateMeasurement(item.key, "items", next);
-                            }}
-                          >
-                            {ventMaterials().map((mat) => (
-                              <option key={mat.code} value={mat.code}>
-                                {mat.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="field">
-                          <label>Quantity</label>
-                          <input
-                            type="number"
-                            min={1}
-                            value={Number(ventItem.quantity || 1)}
-                            onChange={(e) => {
-                              const next = [
-                                ...((item.measurements.items as Array<
-                                  Record<string, unknown>
-                                >) || []),
-                              ];
-                              next[index] = {
-                                ...ventItem,
-                                quantity: Number(e.target.value),
-                              };
-                              updateMeasurement(item.key, "items", next);
-                            }}
-                          />
-                        </div>
+                <div className="stack repeatable-list">
+                  <div className="repeatable-list-header">
+                    <h3 className="repeatable-list-title">Ventilation equipment</h3>
+                    <p className="muted repeatable-list-lead">
+                      {ventRows.length} item{ventRows.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  {ventRows.map((ventItem, index) => (
+                    <div
+                      className="repeatable-row"
+                      key={`${item.key}-vent-${index}`}
+                    >
+                      <span className="repeatable-row-index" aria-hidden="true">
+                        {index + 1}.
+                      </span>
+                      <div className="field">
+                        <label htmlFor={`${item.key}-vent-code-${index}`}>
+                          Equipment
+                        </label>
+                        <select
+                          id={`${item.key}-vent-code-${index}`}
+                          value={String(ventItem.code || "")}
+                          onChange={(e) => {
+                            const next = [...ventRows];
+                            next[index] = { ...ventItem, code: e.target.value };
+                            updateVentilationRows(item.key, next);
+                          }}
+                        >
+                          {ventMaterials().map((mat) => (
+                            <option key={mat.code} value={mat.code}>
+                              {mat.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
-                    ),
-                  )}
+                      <div className="field repeatable-qty-field">
+                        <label htmlFor={`${item.key}-vent-qty-${index}`}>
+                          Qty
+                        </label>
+                        <input
+                          id={`${item.key}-vent-qty-${index}`}
+                          type="number"
+                          min={1}
+                          value={Number(ventItem.quantity || 1)}
+                          onChange={(e) => {
+                            const next = [...ventRows];
+                            next[index] = {
+                              ...ventItem,
+                              quantity: Number(e.target.value),
+                            };
+                            updateVentilationRows(item.key, next);
+                          }}
+                        />
+                      </div>
+                      {!locked ? (
+                        <div className="repeatable-row-actions">
+                          <button
+                            className="btn btn-secondary btn-compact"
+                            type="button"
+                            disabled={index === 0}
+                            aria-label={`Move equipment ${index + 1} up`}
+                            onClick={() => moveVentilationRow(item, index, -1)}
+                          >
+                            Up
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-compact"
+                            type="button"
+                            disabled={index >= ventRows.length - 1}
+                            aria-label={`Move equipment ${index + 1} down`}
+                            onClick={() => moveVentilationRow(item, index, 1)}
+                          >
+                            Down
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-compact"
+                            type="button"
+                            aria-label={`Remove equipment ${index + 1}`}
+                            onClick={() => removeVentilationRow(item, index)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                  {!locked ? (
+                    <div>
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        onClick={() => addVentilationRow(item)}
+                      >
+                        + Add equipment
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
-          ))}
+            );
+          })}
 
           <div className="panel stack">
             <h2 className="panel-title">Job allowances</h2>
-            <div className="row">
-              <div className="field">
-                <label>Travel band</label>
-                <select
-                  value={travelBand}
-                  onChange={(e) => setTravelBand(e.target.value)}
-                >
-                  {travelRates().map((rate) => (
-                    <option key={rate.code} value={rate.code}>
-                      {rate.name} ({formatMoney(rate.cost_per_unit)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label>Waste / skip</label>
-                <select
-                  value={wasteCode}
-                  onChange={(e) => setWasteCode(e.target.value)}
-                >
-                  {wasteRates().map((rate) => (
-                    <option key={rate.code} value={rate.code}>
-                      {rate.name} ({formatMoney(rate.cost_per_unit)})
-                    </option>
-                  ))}
-                </select>
+            <div className="allowance-group stack">
+              <h3 className="allowance-group-title">Travel &amp; disposal</h3>
+              <div className="row">
+                <div className="field">
+                  <label>Travel band</label>
+                  <select
+                    value={travelBand}
+                    onChange={(e) => setTravelBand(e.target.value)}
+                  >
+                    {travelRates().map((rate) => (
+                      <option key={rate.code} value={rate.code}>
+                        {rate.name} ({formatMoney(rate.cost_per_unit)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Waste / skip</label>
+                  <select
+                    value={wasteCode}
+                    onChange={(e) => setWasteCode(e.target.value)}
+                  >
+                    {wasteRates().map((rate) => (
+                      <option key={rate.code} value={rate.code}>
+                        {rate.name} ({formatMoney(rate.cost_per_unit)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-            <div className="row">
-              {prelimRates().map((rate) => {
-                const checked = prelimCodes.includes(rate.code);
-                return (
-                  <label className="check-line" key={rate.code}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => {
-                        setPrelimCodes((current) =>
-                          e.target.checked
-                            ? [...current, rate.code]
-                            : current.filter((code) => code !== rate.code),
-                        );
-                      }}
-                    />
-                    {rate.name}
-                  </label>
-                );
-              })}
+            <div className="allowance-group stack">
+              <h3 className="allowance-group-title">Site access &amp; preliminaries</h3>
+              <div className="allowance-check-grid">
+                {prelimRates().map((rate) => {
+                  const checked = prelimCodes.includes(rate.code);
+                  return (
+                    <label className="check-line" key={rate.code}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setPrelimCodes((current) =>
+                            e.target.checked
+                              ? [...current, rate.code]
+                              : current.filter((code) => code !== rate.code),
+                          );
+                        }}
+                      />
+                      {rate.name}
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
+          </fieldset>
           <div className="step-actions step-actions-sticky">
             <button
               className="btn btn-secondary"
@@ -1401,77 +2832,149 @@ export default function EstimateEditorPage() {
               className="btn btn-primary"
               type="button"
               disabled={saving}
-              onClick={() => void saveAndPrice("pricing")}
+              onClick={() => {
+                if (locked) {
+                  setStep("pricing");
+                  return;
+                }
+                void saveAndPrice("pricing");
+              }}
             >
-              {saving ? "Calculating…" : "Calculate price"}
+              {saving
+                ? "Calculating…"
+                : locked
+                  ? "View price review"
+                  : "Calculate price"}
             </button>
           </div>
         </div>
       ) : null}
 
       {step === "pricing" && estimate ? (
-        <div className="stack">
+        <div className={`stack${locked ? " is-readonly" : ""}`}>
           <div className="panel stack">
             <div className="toolbar">
               <h2 className="panel-title" style={{ margin: 0 }}>
                 Internal price review
               </h2>
-              <span className="internal-tag">Internal only</span>
+              <span className="internal-tag">
+                {locked ? "Locked · Internal only" : "Internal only"}
+              </span>
             </div>
-            <div className="price-grid">
-              <div>
-                <span className="muted">Materials</span>
-                <div className="money">{formatMoney(estimate.materials_cost)}</div>
-              </div>
-              <div>
-                <span className="muted">Labour</span>
-                <div className="money">{formatMoney(estimate.labour_cost)}</div>
-              </div>
-              <div>
-                <span className="muted">Waste</span>
-                <div className="money">{formatMoney(estimate.waste_cost)}</div>
-              </div>
-              <div>
-                <span className="muted">Travel</span>
-                <div className="money">{formatMoney(estimate.travel_cost)}</div>
-              </div>
-              <div>
-                <span className="muted">Preliminaries</span>
-                <div className="money">{formatMoney(estimate.prelim_cost)}</div>
-              </div>
-              <div>
-                <span className="muted">Total cost</span>
-                <div className="money">{formatMoney(estimate.total_cost)}</div>
-              </div>
-            </div>
-            <div className="price-grid">
-              <div>
-                <span className="muted">Target margin</span>
-                <div className="money">{estimate.target_margin_percent.toFixed(2)}%</div>
-              </div>
-              <div>
-                <span className="muted">Calculated sell</span>
-                <div className="money">
-                  {formatMoney(estimate.calculated_sell_price)}
+
+            <div className="cost-allocation-grid">
+              <div className="cost-allocation-group">
+                <h3 className="cost-allocation-title">Direct work cost</h3>
+                <p className="muted cost-allocation-lead">
+                  Materials and labour priced on the selected work types.
+                </p>
+                <div className="price-grid">
+                  <div>
+                    <span className="muted">Materials</span>
+                    <div className="money">{formatMoney(estimate.materials_cost)}</div>
+                  </div>
+                  <div>
+                    <span className="muted">Labour</span>
+                    <div className="money">{formatMoney(estimate.labour_cost)}</div>
+                  </div>
+                  <div>
+                    <span className="muted">Direct subtotal</span>
+                    <div className="money">
+                      {formatMoney(
+                        estimate.materials_cost + estimate.labour_cost,
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <span className="muted">Final sell</span>
-                <div className="money">{formatMoney(estimate.sell_price)}</div>
+
+              <div className="cost-allocation-group">
+                <h3 className="cost-allocation-title">Allocated allowances</h3>
+                <p className="muted cost-allocation-lead">
+                  Waste, travel, and preliminaries shared across work types by
+                  direct cost weight.
+                </p>
+                <div className="price-grid">
+                  <div>
+                    <span className="muted">Waste</span>
+                    <div className="money">{formatMoney(estimate.waste_cost)}</div>
+                  </div>
+                  <div>
+                    <span className="muted">Travel</span>
+                    <div className="money">{formatMoney(estimate.travel_cost)}</div>
+                  </div>
+                  <div>
+                    <span className="muted">Preliminaries</span>
+                    <div className="money">{formatMoney(estimate.prelim_cost)}</div>
+                  </div>
+                  <div>
+                    <span className="muted">Allowances subtotal</span>
+                    <div className="money">
+                      {formatMoney(
+                        estimate.waste_cost +
+                          estimate.travel_cost +
+                          estimate.prelim_cost,
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <span className="muted">Margin value</span>
-                <div className="money">{formatMoney(estimate.margin_value)}</div>
-              </div>
-              <div>
-                <span className="muted">Actual margin</span>
-                <div
-                  className={`money ${estimate.below_target_margin ? "is-danger" : "is-success"}`}
-                >
-                  {estimate.margin_percent.toFixed(2)}%
+
+              <div className="cost-allocation-group is-total">
+                <h3 className="cost-allocation-title">Total priced cost</h3>
+                <div className="money cost-allocation-total">
+                  {formatMoney(estimate.total_cost)}
                 </div>
               </div>
             </div>
+
+            <div className="cost-allocation-group">
+              <h3 className="cost-allocation-title">Sell &amp; margin</h3>
+              <div className="price-grid">
+                <div>
+                  <span className="muted">Target margin</span>
+                  <div className="money">
+                    {estimate.target_margin_percent.toFixed(1)}%
+                  </div>
+                </div>
+                <div>
+                  <span className="muted">Calculated sell</span>
+                  <div className="money">
+                    {formatMoney(estimate.calculated_sell_price)}
+                  </div>
+                </div>
+                <div>
+                  <span className="muted">Final sell</span>
+                  <div className="money">{formatMoney(estimate.sell_price)}</div>
+                </div>
+                <div>
+                  <span className="muted">Margin value</span>
+                  <div className="money">{formatMoney(estimate.margin_value)}</div>
+                </div>
+                <div>
+                  <span className="muted">Actual margin</span>
+                  <div className="margin-health-row">
+                    <span
+                      className={`money ${
+                        estimate.below_target_margin ? "is-danger" : "is-success"
+                      }`}
+                    >
+                      {estimate.margin_percent.toFixed(1)}%
+                    </span>
+                    <span
+                      className={`margin-health-chip ${
+                        estimate.below_target_margin ? "is-below" : "is-on-target"
+                      }`}
+                    >
+                      {estimate.below_target_margin
+                        ? "Below target"
+                        : "On target"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {estimate.min_job_applied ? (
               <div className="info-banner">
                 Minimum job value of{" "}
@@ -1491,54 +2994,126 @@ export default function EstimateEditorPage() {
                 )}
               </div>
             ) : null}
-            <p className="muted">
-              Work-type sells include allocated waste, travel and prelims, and
-              always sum to the job sell price.
-            </p>
-            <div className="row row-align-end">
-              <div className="field">
-                <label htmlFor="override_sell">Override sell price (£)</label>
-                <input
-                  id="override_sell"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={overrideSell}
-                  onChange={(e) => setOverrideSell(e.target.value)}
-                  placeholder="Leave blank for calculated price"
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="override_reason">Override reason</label>
-                <input
-                  id="override_reason"
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  placeholder="Required when overriding"
-                  disabled={overrideSell.trim() === ""}
-                />
-              </div>
-              <button
-                className="btn btn-secondary field-action"
-                type="button"
-                disabled={saving}
-                onClick={() => void saveAndPrice("pricing")}
-              >
-                Recalculate margin
-              </button>
-            </div>
-            <div className="stack">
-              {estimate.items.map((item) => (
-                <div key={item.id} className="line-summary">
-                  <strong>{item.label}</strong>
-                  <p className="muted">{item.description}</p>
-                  <div className="row">
-                    <span>Cost {formatMoney(item.line_cost)}</span>
-                    <span>Sell {formatMoney(item.line_sell)}</span>
-                    <span>Target {item.target_margin_percent}%</span>
+
+            {locked ? (
+              <p className="muted">
+                Override controls are unavailable while this estimate is locked.
+              </p>
+            ) : (
+              <div className="stack">
+                <div className="row row-align-end">
+                  <div className="field">
+                    <label htmlFor="override_sell">Override sell price (£)</label>
+                    <input
+                      id="override_sell"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={overrideSell}
+                      onChange={(e) => setOverrideSell(e.target.value)}
+                      placeholder="Leave blank for calculated price"
+                    />
                   </div>
+                  <div className="field">
+                    <label htmlFor="override_reason">Override reason</label>
+                    <input
+                      id="override_reason"
+                      value={overrideReason}
+                      onChange={(e) => setOverrideReason(e.target.value)}
+                      placeholder="Required when overriding"
+                      disabled={overrideSell.trim() === ""}
+                    />
+                  </div>
+                  <button
+                    className="btn btn-secondary field-action"
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void saveAndPrice("pricing")}
+                  >
+                    Recalculate margin
+                  </button>
                 </div>
-              ))}
+                {overrideSell.trim() !== "" ? (
+                  <div>
+                    <button
+                      className="btn btn-secondary btn-compact"
+                      type="button"
+                      disabled={saving}
+                      onClick={() => {
+                        setOverrideSell("");
+                        setOverrideReason("");
+                        void saveAndPrice("pricing", undefined, {
+                          sell: "",
+                          reason: "",
+                        });
+                      }}
+                    >
+                      Restore calculated price
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            <div className="stack">
+              <div className="work-type-pricing-header">
+                <h3 className="cost-allocation-title" style={{ margin: 0 }}>
+                  Work-type cost allocation
+                </h3>
+                <p className="muted" style={{ margin: 0 }}>
+                  Each work type shows direct cost, its share of allowances, then
+                  the fully loaded cost used for target sell.
+                </p>
+              </div>
+              {estimate.items.map((item, index) => {
+                const breakdownLine = getBreakdownLines(estimate)[index];
+                const directCost = breakdownLine?.line_cost ?? item.line_cost;
+                const allocated =
+                  breakdownLine?.allocated_job_cost ??
+                  Math.max(0, (breakdownLine?.fully_loaded_cost ?? 0) - directCost);
+                const fullyLoaded =
+                  breakdownLine?.fully_loaded_cost ??
+                  directCost + allocated;
+                const targetSell = breakdownLine?.line_sell ?? item.line_sell;
+                return (
+                  <details
+                    key={item.id}
+                    className="line-summary line-summary-alloc"
+                    open={estimate.items.length <= 2}
+                  >
+                    <summary className="line-summary-summary">
+                      <span className="line-summary-title">{item.label}</span>
+                      <span className="line-summary-meta muted">
+                        Total priced cost {formatMoney(fullyLoaded)} · Target sell{" "}
+                        {formatMoney(targetSell)}
+                      </span>
+                    </summary>
+                    <p className="muted">{item.description}</p>
+                    <div className="price-grid line-alloc-grid">
+                      <div>
+                        <span className="muted">Direct work cost</span>
+                        <div className="money">{formatMoney(directCost)}</div>
+                      </div>
+                      <div>
+                        <span className="muted">Allocated allowances</span>
+                        <div className="money">{formatMoney(allocated)}</div>
+                      </div>
+                      <div>
+                        <span className="muted">Total priced cost</span>
+                        <div className="money">{formatMoney(fullyLoaded)}</div>
+                      </div>
+                      <div>
+                        <span className="muted">Target sell</span>
+                        <div className="money">{formatMoney(targetSell)}</div>
+                      </div>
+                      <div>
+                        <span className="muted">Target margin</span>
+                        <div className="money">{item.target_margin_percent}%</div>
+                      </div>
+                    </div>
+                  </details>
+                );
+              })}
             </div>
           </div>
           <div className="step-actions step-actions-sticky">
@@ -1553,11 +3128,19 @@ export default function EstimateEditorPage() {
               className="btn btn-primary"
               type="button"
               disabled={saving}
-              onClick={() =>
-                void saveAndPrice("quotation", "ready_to_quote")
-              }
+              onClick={() => {
+                if (locked) {
+                  setStep("quotation");
+                  return;
+                }
+                void saveAndPrice("quotation", "ready_to_quote");
+              }}
             >
-              {saving ? "Preparing…" : "Generate quotation"}
+              {saving
+                ? "Preparing…"
+                : locked
+                  ? "View quotation"
+                  : "Generate quotation"}
             </button>
           </div>
         </div>
@@ -1565,6 +3148,12 @@ export default function EstimateEditorPage() {
 
       {step === "quotation" && quotation ? (
         <div className="stack">
+          {quotation.lines_reconciled === false ? (
+            <div className="error-banner">
+              Internal: line amounts do not match the subtotal. Recalculate
+              pricing before issuing this quotation.
+            </div>
+          ) : null}
           <div className="panel stack quote-preview">
             <div className="quote-panel-header">
               <div>
@@ -1576,16 +3165,31 @@ export default function EstimateEditorPage() {
                 </p>
               </div>
               <div className="export-cluster">
+                {quotation.lines_reconciled === false ? (
+                  <span className="internal-tag is-warning" title="Internal check">
+                    Lines do not balance
+                  </span>
+                ) : (
+                  <span className="internal-tag" title="Internal check">
+                    Lines balanced
+                  </span>
+                )}
                 <span className="export-cluster-label">Export</span>
                 <div className="btn-segment" role="group" aria-label="Export quotation">
-                  <a
-                    className="btn btn-primary"
-                    href={quotationPdfUrl(quotation.estimate.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    PDF
-                  </a>
+                  {quoteAmountsOk ? (
+                    <a
+                      className="btn btn-primary"
+                      href={quotationPdfUrl(quotation.estimate.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      PDF
+                    </a>
+                  ) : (
+                    <button className="btn btn-primary" type="button" disabled>
+                      PDF
+                    </button>
+                  )}
                   <a
                     className="btn btn-secondary"
                     href={estimateCsvUrl(quotation.estimate.id)}
@@ -1624,9 +3228,9 @@ export default function EstimateEditorPage() {
               {quotation.estimate.site_address} {quotation.estimate.postcode}
             </p>
             <p className="muted">
-              Issue date: {quotation.issue_date || "—"}
+              Issue date: {formatUkDate(quotation.issue_date)}
               {" · "}
-              Valid until: {quotation.valid_until || "—"}
+              Valid until: {formatUkDate(quotation.valid_until)}
             </p>
             <div className="quote-line-grid">
               {quotation.scope_lines.map((line, index) => (
@@ -1651,20 +3255,13 @@ export default function EstimateEditorPage() {
                 Total (inc VAT): {formatMoney(quotation.total_inc_vat)}
               </div>
             </div>
-            {quotation.lines_reconciled ? (
-              <p className="muted">
-                Line amounts reconcile to subtotal (
-                {formatMoney(quotation.line_amount_sum || 0)}).
-              </p>
-            ) : (
-              <div className="error-banner">
-                Line amounts do not reconcile to subtotal — regenerate pricing.
-              </div>
-            )}
             <p className="muted">{quotation.payment_terms}</p>
             <p className="muted">
               Valid for {quotation.validity_days} days
-              {quotation.valid_until ? ` (until ${quotation.valid_until})` : ""}.
+              {quotation.valid_until
+                ? ` (until ${formatUkDate(quotation.valid_until)})`
+                : ""}
+              .
             </p>
             {quotation.guarantee_wording ? (
               <div>
@@ -1711,7 +3308,7 @@ export default function EstimateEditorPage() {
                 Back to price review
               </button>
               <Link className="btn btn-secondary" to="/">
-                Done
+                Back to estimates
               </Link>
             </div>
             {estimate?.status === "ready_to_quote" ? (
@@ -1719,10 +3316,10 @@ export default function EstimateEditorPage() {
                 <button
                   className="btn btn-primary"
                   type="button"
-                  disabled={saving}
-                  onClick={() => void onMarkQuoted()}
+                  disabled={saving || !quoteAmountsOk}
+                  onClick={() => requestMarkQuoted()}
                 >
-                  Mark as quoted
+                  Issue quotation
                 </button>
               </div>
             ) : null}
@@ -1740,9 +3337,37 @@ export default function EstimateEditorPage() {
               <span className="internal-tag">Post-job costing</span>
             </div>
             <p className="muted">
-              Compare estimated job costs against actual materials, labour, and
-              allowances. Revenue defaults to the quoted sell unless overridden.
+              Leave a category blank until the cost is known. Blank means not
+              entered — not £0. Final actual margin is shown only when all cost
+              categories are filled.
             </p>
+            {jobActuals ? (
+              <div className="info-banner actuals-status-banner">
+                <StatusPill
+                  label={actualsStatusLabel(jobActuals.status)}
+                  tone={
+                    jobActuals.status === "complete"
+                      ? "is-success"
+                      : jobActuals.status === "partial"
+                        ? "is-review"
+                        : "is-draft"
+                  }
+                />
+                <span>
+                  {jobActuals.categories_entered} of {jobActuals.categories_total}{" "}
+                  cost categories entered
+                </span>
+              </div>
+            ) : null}
+            {jobActuals && jobActuals.categories_entered === 0 ? (
+              <div className="empty-state" style={{ padding: "0.75rem 0" }}>
+                <strong>No actual costs recorded</strong>
+                <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                  Add job costs when work begins or after completion. Blank
+                  fields mean not entered — not £0.
+                </p>
+              </div>
+            ) : null}
             {canManageActuals ? (
               <form className="stack" onSubmit={onSaveActuals}>
                 <div className="row">
@@ -1753,11 +3378,6 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      placeholder={
-                        estimate
-                          ? String(estimate.materials_cost || 0)
-                          : undefined
-                      }
                       value={actualsForm.materials_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1766,6 +3386,9 @@ export default function EstimateEditorPage() {
                         })
                       }
                     />
+                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                      Estimated: {formatMoney(estimate.materials_cost || 0)}
+                    </p>
                   </div>
                   <div className="field">
                     <label htmlFor="labour_actual">Labour (£)</label>
@@ -1774,11 +3397,6 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      placeholder={
-                        estimate
-                          ? String(estimate.labour_cost || 0)
-                          : undefined
-                      }
                       value={actualsForm.labour_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1787,6 +3405,9 @@ export default function EstimateEditorPage() {
                         })
                       }
                     />
+                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                      Estimated: {formatMoney(estimate.labour_cost || 0)}
+                    </p>
                   </div>
                   <div className="field">
                     <label htmlFor="waste_actual">Waste (£)</label>
@@ -1795,11 +3416,6 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      placeholder={
-                        estimate
-                          ? String(estimate.waste_cost || 0)
-                          : undefined
-                      }
                       value={actualsForm.waste_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1808,6 +3424,9 @@ export default function EstimateEditorPage() {
                         })
                       }
                     />
+                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                      Estimated: {formatMoney(estimate.waste_cost || 0)}
+                    </p>
                   </div>
                 </div>
                 <div className="row">
@@ -1818,11 +3437,6 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      placeholder={
-                        estimate
-                          ? String(estimate.travel_cost || 0)
-                          : undefined
-                      }
                       value={actualsForm.travel_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1831,6 +3445,9 @@ export default function EstimateEditorPage() {
                         })
                       }
                     />
+                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                      Estimated: {formatMoney(estimate.travel_cost || 0)}
+                    </p>
                   </div>
                   <div className="field">
                     <label htmlFor="prelims_actual">Preliminaries (£)</label>
@@ -1839,11 +3456,6 @@ export default function EstimateEditorPage() {
                       type="number"
                       min={0}
                       step="0.01"
-                      placeholder={
-                        estimate
-                          ? String(estimate.prelim_cost || 0)
-                          : undefined
-                      }
                       value={actualsForm.prelims_actual}
                       onChange={(e) =>
                         setActualsForm({
@@ -1852,6 +3464,9 @@ export default function EstimateEditorPage() {
                         })
                       }
                     />
+                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                      Estimated: {formatMoney(estimate.prelim_cost || 0)}
+                    </p>
                   </div>
                   <div className="field">
                     <label htmlFor="other_actual">Other (£)</label>
@@ -1868,6 +3483,9 @@ export default function EstimateEditorPage() {
                         })
                       }
                     />
+                    <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                      Estimated: {formatMoney(0)}
+                    </p>
                   </div>
                 </div>
                 <div className="field">
@@ -1886,8 +3504,10 @@ export default function EstimateEditorPage() {
                         revenue_actual: e.target.value,
                       })
                     }
-                    placeholder={String(estimate.sell_price)}
                   />
+                  <p className="muted" style={{ margin: "0.35rem 0 0" }}>
+                    Quoted sell: {formatMoney(estimate.sell_price)}
+                  </p>
                 </div>
                 <div className="field">
                   <label htmlFor="actuals_notes">Notes</label>
@@ -1917,6 +3537,12 @@ export default function EstimateEditorPage() {
           {jobActuals ? (
             <div className="panel stack">
               <h2 className="panel-title">Variance summary</h2>
+              {jobActuals.status !== "complete" ? (
+                <p className="muted">
+                  Actual margin is shown only when all six cost categories are
+                  entered. Missing values show as “Not entered”, not £0.
+                </p>
+              ) : null}
               <div className="variance-table-wrap">
                 <table className="variance-table">
                   <thead>
@@ -1944,30 +3570,45 @@ export default function EstimateEditorPage() {
                       <tr key={row.label}>
                         <td>{row.label}</td>
                         <td className="money">{formatMoney(row.estimated)}</td>
-                        <td className="money">{formatMoney(row.actual)}</td>
+                        <td className="money">
+                          {row.entered
+                            ? formatOptionalMoney(row.actual)
+                            : "Not entered"}
+                        </td>
                         <td
                           className={`money ${varianceTone(row.label, row.variance)}`}
                         >
-                          {formatMoney(row.variance)}
+                          {row.entered
+                            ? formatOptionalMoney(row.variance)
+                            : "—"}
                         </td>
                       </tr>
                     ))}
                     <tr>
                       <td>Margin %</td>
                       <td>
-                        {jobActuals.comparison.estimated_margin_percent.toFixed(2)}%
+                        {jobActuals.comparison.estimated_margin_percent.toFixed(
+                          2,
+                        )}
+                        %
                       </td>
                       <td>
-                        {jobActuals.comparison.actual_margin_percent.toFixed(2)}%
+                        {jobActuals.comparison.actual_margin_percent != null
+                          ? `${jobActuals.comparison.actual_margin_percent.toFixed(2)}%`
+                          : "—"}
                       </td>
                       <td
                         className={
-                          jobActuals.comparison.margin_percent_variance < 0
-                            ? "is-danger"
-                            : "is-success"
+                          jobActuals.comparison.margin_percent_variance == null
+                            ? ""
+                            : jobActuals.comparison.margin_percent_variance < 0
+                              ? "is-danger"
+                              : "is-success"
                         }
                       >
-                        {jobActuals.comparison.margin_percent_variance.toFixed(2)}%
+                        {jobActuals.comparison.margin_percent_variance != null
+                          ? `${jobActuals.comparison.margin_percent_variance.toFixed(2)}%`
+                          : "—"}
                       </td>
                     </tr>
                   </tbody>
@@ -1985,11 +3626,35 @@ export default function EstimateEditorPage() {
               Back to quotation
             </button>
             <Link className="btn btn-secondary" to="/">
-              Done
+              Back to estimates
             </Link>
           </div>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(pendingConfirm)}
+        title={pendingConfirm?.title || ""}
+        message={pendingConfirm?.message || ""}
+        confirmLabel={pendingConfirm?.confirmLabel || "Confirm"}
+        tone={pendingConfirm?.tone || "primary"}
+        busy={confirmBusy || saving}
+        onCancel={() => {
+          if (!confirmBusy) setPendingConfirm(null);
+        }}
+        onConfirm={() => void runPendingConfirm()}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingLeaveHref)}
+        title="Leave without saving?"
+        message="You have unsaved changes on this estimate. Leave and discard them, or stay to save."
+        confirmLabel="Leave without saving"
+        cancelLabel="Stay"
+        tone="danger"
+        onCancel={() => setPendingLeaveHref(null)}
+        onConfirm={confirmLeaveWithoutSaving}
+      />
     </section>
   );
 }

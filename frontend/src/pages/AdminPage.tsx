@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import ConfirmDialog from "../components/ConfirmDialog";
 import {
   EstimateListSkeleton,
   LoadingButton,
@@ -14,6 +15,7 @@ import {
   getSystemInfo,
 } from "../api";
 import { getStoredUser } from "../auth";
+import { formatUkDateTime } from "../locale";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -22,11 +24,39 @@ function formatBytes(bytes: number) {
 }
 
 function formatWhen(iso: string) {
-  try {
-    return new Date(iso).toLocaleString("en-GB");
-  } catch {
-    return iso;
+  return formatUkDateTime(iso, iso);
+}
+
+function formatEnvironment(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "local_production") return "Office production";
+  if (normalized === "vercel") return "Hosted";
+  if (normalized === "demo") return "Demo";
+  if (normalized === "development" || normalized === "dev") return "Development";
+  return value.replaceAll("_", " ");
+}
+
+function backupFreshness(iso: string | null | undefined): {
+  label: string;
+  tone: "is-success" | "is-warning" | "is-danger";
+} {
+  if (!iso) {
+    return { label: "No backup yet — create one before live work", tone: "is-danger" };
   }
+  const ageHours = (Date.now() - new Date(iso).getTime()) / 3_600_000;
+  if (Number.isNaN(ageHours)) {
+    return { label: "Backup time unavailable", tone: "is-warning" };
+  }
+  if (ageHours < 24) {
+    return { label: "Up to date (within 24 hours)", tone: "is-success" };
+  }
+  if (ageHours < 72) {
+    return {
+      label: "Due soon — last backup more than 24 hours ago",
+      tone: "is-warning",
+    };
+  }
+  return { label: "Overdue — create a backup now", tone: "is-danger" };
 }
 
 export default function AdminPage() {
@@ -39,7 +69,14 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
+  const [restoreConfirm, setRestoreConfirm] = useState<BackupRow | null>(null);
+
+  const latestBackup = useMemo(() => backups[0] ?? null, [backups]);
+  const freshness = useMemo(
+    () => backupFreshness(latestBackup?.created_at),
+    [latestBackup],
+  );
+  const retentionKeep = system?.backup_retention_keep ?? 30;
 
   async function refresh() {
     const [rows, info] = await Promise.all([listBackups(), getSystemInfo()]);
@@ -80,7 +117,7 @@ export default function AdminPage() {
     try {
       const row = await createBackup();
       await refresh();
-      setMessage(`Backup created: ${row.filename}`);
+      setMessage(`Backup created successfully (${formatWhen(row.created_at)}).`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Backup failed.");
     } finally {
@@ -93,15 +130,11 @@ export default function AdminPage() {
     setError(null);
     setMessage(null);
     try {
-      const result = await restoreBackup(filename);
+      await restoreBackup(filename);
       await refresh();
-      setRestoreTarget(null);
+      setRestoreConfirm(null);
       setMessage(
-        `Restored ${result.restored_from}. Restart the backend to reload the database.${
-          result.pre_restore_backup
-            ? ` Safety copy: ${result.pre_restore_backup}.`
-            : ""
-        }`,
+        "Restore complete. A safety copy of the previous data was kept automatically. Refresh the page if displayed data looks out of date.",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Restore failed.");
@@ -135,38 +168,72 @@ export default function AdminPage() {
       <div className="page-header">
         <h1 className="page-title">Admin</h1>
         <p className="page-lead">
-          Database backups and system status for local production.
+          Backup status, system health, and restore controls for this
+          installation.
         </p>
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
-      {message ? <div className="panel">{message}</div> : null}
+      {message ? <div className="info-banner">{message}</div> : null}
 
       {system ? (
         <div className="panel">
-          <h2 className="panel-title">System</h2>
+          <h2 className="panel-title">Backup status</h2>
+          <p className={`backup-freshness ${freshness.tone}`} role="status">
+            {freshness.label}
+          </p>
           <ul className="meta-list">
             <li>
-              <span>Application</span>
-              <strong>{system.app}</strong>
+              <span>Last successful backup</span>
+              <strong>
+                {latestBackup
+                  ? formatWhen(latestBackup.created_at)
+                  : "None yet"}
+              </strong>
             </li>
             <li>
-              <span>Version</span>
-              <strong>{system.version}</strong>
+              <span>Stored backups</span>
+              <strong>{system.backup_count}</strong>
             </li>
             <li>
-              <span>Environment</span>
-              <strong>{system.environment}</strong>
+              <span>Retention</span>
+              <strong>Keep latest {retentionKeep}</strong>
+            </li>
+            <li>
+              <span>Recommended cadence</span>
+              <strong>
+                {system.backup_recommended_cadence === "daily"
+                  ? "Daily"
+                  : system.backup_recommended_cadence || "Daily"}
+              </strong>
+            </li>
+            <li>
+              <span>Latest size</span>
+              <strong>
+                {latestBackup ? formatBytes(latestBackup.size_bytes) : "—"}
+              </strong>
             </li>
             <li>
               <span>Database</span>
               <strong>{system.database_ok ? "Connected" : "Unavailable"}</strong>
             </li>
             <li>
-              <span>Stored backups</span>
-              <strong>{system.backup_count}</strong>
+              <span>Application</span>
+              <strong>
+                {system.app} · v{system.version}
+              </strong>
+            </li>
+            <li>
+              <span>Environment</span>
+              <strong>{formatEnvironment(system.environment)}</strong>
             </li>
           </ul>
+          <p className="backup-schedule-note">
+            Create a backup at least daily during active quoting, and after
+            significant rate or settings changes. Older copies beyond the
+            retention limit are pruned automatically when a new backup is
+            created.
+          </p>
         </div>
       ) : null}
 
@@ -179,7 +246,7 @@ export default function AdminPage() {
           disabled={loading}
           onClick={() => void handleCreateBackup()}
         >
-          Create backup
+          {backups.length === 0 ? "Create first backup" : "Create backup now"}
         </LoadingButton>
       </div>
 
@@ -190,26 +257,28 @@ export default function AdminPage() {
         </>
       ) : backups.length === 0 ? (
         <div className="panel empty-state">
-          <strong>No backups yet</strong>
-          Create the first copy before live commercial use.
+          <strong>No backups have been created yet</strong>
+          <p className="muted" style={{ margin: "0.45rem 0 0" }}>
+            Create a backup before using this system for live commercial work.
+          </p>
         </div>
       ) : (
         <div className="panel variance-table-wrap">
           <table className="variance-table">
             <thead>
               <tr>
-                <th>Filename</th>
-                <th>Size</th>
                 <th>Created</th>
+                <th>Size</th>
+                <th>File</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {backups.map((row) => (
                 <tr key={row.filename}>
-                  <td>{row.filename}</td>
-                  <td>{formatBytes(row.size_bytes)}</td>
                   <td>{formatWhen(row.created_at)}</td>
+                  <td>{formatBytes(row.size_bytes)}</td>
+                  <td>{row.filename}</td>
                   <td>
                     <div className="inline-actions">
                       <button
@@ -219,36 +288,14 @@ export default function AdminPage() {
                       >
                         Download
                       </button>
-                      {restoreTarget === row.filename ? (
-                        <>
-                          <button
-                            className="btn btn-primary"
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void handleRestore(row.filename)}
-                          >
-                            Confirm restore
-                          </button>
-                          <button
-                            className="btn btn-secondary"
-                            type="button"
-                            disabled={busy}
-                            onClick={() => setRestoreTarget(null)}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="btn btn-secondary"
-                          type="button"
-                          disabled={busy}
-                          onClick={() => setRestoreTarget(row.filename)}
-                        >
-                          Restore
-                        </button>
-                      )}
-                    </div>
+                      <button
+                        className="btn btn-secondary"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setRestoreConfirm(row)}
+                      >
+                        Restore
+                      </button>                    </div>
                   </td>
                 </tr>
               ))}
@@ -258,10 +305,28 @@ export default function AdminPage() {
       )}
 
       <div className="panel muted">
-        Restore replaces the live SQLite database. A pre-restore safety copy is
-        created automatically. Restart the backend after restore. See{" "}
-        <code>docs/ADMIN_GUIDE.md</code> for PowerShell scripts.
+        Restoring a backup replaces current application data with the selected
+        backup. A safety copy is created automatically before restore.
       </div>
+
+      <ConfirmDialog
+        open={Boolean(restoreConfirm)}
+        title="Restore backup?"
+        message={
+          restoreConfirm
+            ? `Restoring the backup from ${formatWhen(restoreConfirm.created_at)} replaces current application data. A safety copy of the current data is created automatically before restore.`
+            : ""
+        }
+        confirmLabel="Restore backup"
+        tone="danger"
+        busy={busy}
+        onCancel={() => {
+          if (!busy) setRestoreConfirm(null);
+        }}
+        onConfirm={() => {
+          if (restoreConfirm) void handleRestore(restoreConfirm.filename);
+        }}
+      />
     </section>
   );
 }
